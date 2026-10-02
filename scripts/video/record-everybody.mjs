@@ -36,14 +36,13 @@ execFileSync(VEGA, ["run-app", vpkg, "com.glitchbound.everybodymoves.main", "-d"
 execFileSync("osascript", ["-e", 'tell application "System Events" to set frontmost of (first process whose name contains "vega-virtual-device") to true']);
 await sleep(7);
 
-// 2. Where the TV picture is on screen (points). The window has a 28 pt title bar; the TV area is 960 x 540.
-const bounds = JSON.parse(execFileSync("swift", ["-e", `import CoreGraphics
+// 2. The simulator's window id. The recording is of that window only (-l, -o: no shadow), which
+// keeps working when the screen saver is up; the TV picture is the window minus its 28 pt title bar.
+const winId = execFileSync("swift", ["-e", `import CoreGraphics
 let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as! [[String: Any]]
-for w in list where (w[kCGWindowOwnerName as String] as? String ?? "").contains("vega-virtual-device") && ((w[kCGWindowLayer as String] as? Int) ?? 1) == 0 {
-  let b = w[kCGWindowBounds as String] as! [String: Any]
-  print("{\\"x\\":\\(b["X"]!),\\"y\\":\\(b["Y"]!),\\"w\\":\\(b["Width"]!),\\"h\\":\\(b["Height"]!)}"); break }`]).toString());
-const tv = { x: Math.round(bounds.x * 2), y: Math.round((bounds.y + 28) * 2), w: 1920, h: 1080 };
-console.log("window", bounds, "tv crop px", tv);
+for w in list where (w[kCGWindowOwnerName as String] as? String ?? "").contains("vega-virtual-device") && ((w[kCGWindowLayer as String] as? Int) ?? 1) == 0 { print(w[kCGWindowNumber as String]!); break }`]).toString().trim();
+const tv = { crop: "1912:1076:4:58" }; // inside the 2320 x 1136 window video
+console.log("window", winId);
 
 // 3. Phones: two headless Chrome pages, each recorded.
 const browser = await chromium.launch({ channel: "chrome", headless: true });
@@ -62,7 +61,7 @@ const lily = await phone("lily");
 // screencapture only saves a video when its own time limit ends (a signal discards it), so it
 // gets a fixed length that covers the whole timeline (about 160 s).
 const CAPTURE_SECONDS = 185;
-const ff = spawn("screencapture", ["-x", "-v", "-V", String(CAPTURE_SECONDS), "-R", `${bounds.x},${bounds.y + 28},960,540`, path.join(OUT, "tv.mov")], { stdio: "ignore" });
+const ff = spawn("screencapture", ["-x", "-o", "-v", "-V", String(CAPTURE_SECONDS), "-l", winId, path.join(OUT, "tv.mov")], { stdio: "ignore" });
 await sleep(1.0);
 T0 = Date.now();
 mark("capture started");
@@ -102,9 +101,14 @@ await sleep(0.6);
 await press("LEFT", "ENTER"); // build our plan
 // Plan screen: wait for the coach's introduction to finish.
 const waitFor = async (pred, max = 60) => { const end = Date.now() + max * 1000; while (Date.now() < end) { const s = await (await fetch(`${BASE}/api/session/${code}`)).json(); if (pred(s)) return s; await sleep(0.5); } };
-await waitFor((s) => s.status === "ready");
+const ready = await waitFor((s) => s.status === "ready");
 mark("plan ready");
-await sleep(16);
+// Let the coach finish the introduction (Start stops it), plus room for one narration line.
+const introMp3 = path.join(OUT, "intro.mp3");
+writeFileSync(introMp3, Buffer.from(await (await fetch(`${BASE}/api/tts?t=${encodeURIComponent(ready.coach.text)}`)).arrayBuffer()));
+const introLen = parseFloat(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", introMp3]).toString());
+mark(`coach introduction is ${introLen.toFixed(1)} s`);
+await sleep(Math.max(16, introLen + 2.5 + 8.5));
 await press("ENTER"); // Start
 await waitFor((s) => s.status === "live");
 mark("workout live");

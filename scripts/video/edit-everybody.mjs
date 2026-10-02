@@ -14,13 +14,15 @@ const WORK = path.join(DIR, "edit");
 rmSync(WORK, { recursive: true, force: true });
 mkdirSync(WORK, { recursive: true });
 const tl = JSON.parse(readFileSync(path.join(RAW, "timeline.json"), "utf8"));
+// Window recordings carry the title bar; crop to the TV picture and restore 1920 x 1080.
+const TVF = tl.tv?.crop ? `crop=${tl.tv.crop},scale=1920:1080,` : "";
 const BASE = "https://everybody-moves.meshulam791.workers.dev";
 const run = (args) => execFileSync("ffmpeg", ["-y", "-loglevel", "error", ...args]);
 const dur = (f) => parseFloat(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", f]).toString());
 const ev = (re, from = 0) => tl.log.find((l) => re.test(l.what) && l.t >= from)?.t;
 
 // 1. Sync the TV video to the timeline: its first big screen change is the first ENTER (home -> lobby).
-const sceneLog = execFileSync("bash", ["-c", `ffmpeg -hide_banner -i "${path.join(RAW, "tv.mov")}" -t 40 -vf "scale=480:-1,select='gt(scene,0.1)',showinfo" -f null - 2>&1 | grep -o 'pts_time:[0-9.]*' | cut -d: -f2`]).toString().trim().split("\n").map(Number);
+const sceneLog = execFileSync("bash", ["-c", `ffmpeg -hide_banner -i "${path.join(RAW, "tv.mov")}" -t 40 -vf "${TVF}scale=480:-1,select='gt(scene,0.1)',showinfo" -f null - 2>&1 | grep -o 'pts_time:[0-9.]*' | cut -d: -f2`]).toString().trim().split("\n").map(Number);
 const firstPress = ev(/^pressed ENTER$/);
 const firstChange = sceneLog.find((x) => x > firstPress - 2);
 const tvOffset = firstChange - firstPress; // tv video time = timeline time + tvOffset
@@ -44,8 +46,8 @@ const tLive = ev(/workout live/);
 const tSkip = ev(/skipped ahead/);
 const tEnd = ev(/^end$/);
 const RANGES = [
-  [tHome, tLive + 34],
-  [tSkip - 6, tEnd - 2],
+  [tHome, tLive + 24],
+  [tSkip - 6, tEnd - 4],
 ];
 console.log("ranges", RANGES);
 
@@ -58,7 +60,7 @@ const coach = tl.lines.map((l) => ({ text: l.text, t: (l.at - tl.T0) / 1000 }));
 const NARRATION = [
   ["This is the real app, running on the Vega Virtual Device, Amazon's Fire TV simulator, with a sample family and two weeks of history.", tHome + 0.6],
   ["Everyone joins by scanning the code. Maya marks sore knees. Lily feels great. Ben and Grandpa Joe join with the remote.", tRoom + 1.0],
-  ["The plan comes from those check-ins and the family's history. The language model only words it, and the server rejects anything it adds.", tPlan + 1],
+  ["The plan comes from those check-ins and the family's history. The model only words it, and rules check every reply.", null],
   ["Same move, different versions. The phones show each person's own version, the same timer, and captions of the coach.", tLive + 3],
   ["The remote runs the session. Pause, go back, or skip ahead. This recording runs at demo pace, five times faster.", tSkip - 6],
   ["Afterwards, everyone says how it felt, on a phone or with the remote.", tOver + 1],
@@ -97,7 +99,8 @@ for (const [i, c] of coach.entries()) {
 const narr = [{ f: intro.wav, o: 0.5, d: intro.dur, text: INTRO }];
 for (const [text, anchor] of NARRATION) {
   const { wav, dur: d } = tts(text, "narrator");
-  let o = toOut(anchor);
+  // A null anchor means "right after the coach's introduction".
+  let o = anchor == null ? (coachClips[0] ? coachClips[0].o + coachClips[0].d + 0.3 : null) : toOut(anchor);
   if (o == null) continue;
   const speaking = coachClips.find((c) => o >= c.o - 0.2 && o < c.o + c.d);
   if (speaking) o = speaking.o + speaking.d + 0.3;
@@ -131,7 +134,7 @@ const endPng = await still("end", `<div style="height:100%;display:flex;flex-dir
   <li>Vega W3C media AudioPlayer: the coach's voice</li>
   <li>react-native-svg: exercise figures, countdown ring, QR code</li>
   <li>Cloudflare Workers + D1: planner, sessions, phone check-in</li>
-  <li>Workers AI: Llama 4 Scout (coach intro, fact-checked), Deepgram Aura-2 (voice)</li></ul>
+  <li>Workers AI: Llama 4 Scout (coach intro, checked by rules before it's spoken), Deepgram Aura-2 (voice)</li></ul>
   <div style="font-size:26px;color:#8A91A0;margin-top:40px">github.com/danielhagever/everybody-moves</div></div>`);
 // Layout: TV 1200x675 at (36,150); phones 312x675 at (1272,150) and (1604,150).
 const framePng = await still("frame", `
@@ -167,7 +170,7 @@ for (const [ri, [a, b]] of RANGES.entries()) {
     const d = from - a + Math.max(0, -(from + off));
     return d > 0.01 ? `,tpad=start_duration=${d.toFixed(3)}:color=0x1A1F29` : "";
   };
-  let fc = `[1:v]fps=30,scale=1200:675,setpts=PTS-STARTPTS[tv];[2:v]fps=30,scale=312:675,setpts=PTS-STARTPTS${pad(phoneOffset.maya)}[m];[3:v]fps=30,scale=312:675,setpts=PTS-STARTPTS${pad(phoneOffset.lily)}[l];` +
+  let fc = `[1:v]${TVF}fps=30,scale=1200:675,setpts=PTS-STARTPTS[tv];[2:v]fps=30,scale=312:675,setpts=PTS-STARTPTS${pad(phoneOffset.maya)}[m];[3:v]fps=30,scale=312:675,setpts=PTS-STARTPTS${pad(phoneOffset.lily)}[l];` +
     `[0:v][tv]overlay=36:150[v1];[v1][m]overlay=1272:150[v2];[v2][l]overlay=1604:150[v3]`;
   let last = "v3";
   mySubs.forEach((s, i) => {
@@ -207,11 +210,11 @@ for (let [name, tt] of STILLS) {
   // file can land nowhere.
   const back = Math.min(20, tt + tvOffset);
   // screencapture writes frames only when the screen changes; fps=30 repeats the last one.
-  run(["-ss", String(tt + tvOffset - back), "-i", path.join(RAW, "tv.mov"), "-vf", "fps=30", "-ss", String(back), "-frames:v", "1", "-update", "1", path.join(WORK, name + ".png")]);
+  run(["-ss", String(tt + tvOffset - back), "-i", path.join(RAW, "tv.mov"), "-vf", `${TVF}fps=30`, "-ss", String(back), "-frames:v", "1", "-update", "1", path.join(WORK, name + ".png")]);
   if (!existsSync(path.join(WORK, name + ".png"))) throw new Error("still not written: " + name);
   execFileSync("sips", ["-s", "format", "jpeg", "-s", "formatOptions", "90", path.join(WORK, name + ".png"), "--out", path.join(process.env.HOME, "money-10x/submissions/images", name + ".jpg")], { stdio: "ignore" });
 }
-const tJacksOut = toOut(tPlank + 4) ?? toOut(tJacks + 4);
+const tJacksOut = toOut(tLive + 6) ?? toOut(tPlank + 4);
 if (tJacksOut != null) {
   run(["-ss", String(tJacksOut), "-i", final, "-frames:v", "1", "-update", "1", path.join(WORK, "composite.png")]);
   execFileSync("sips", ["-s", "format", "jpeg", "-s", "formatOptions", "90", path.join(WORK, "composite.png"), "--out", path.join(process.env.HOME, "money-10x/submissions/images", "everybody-6-tv-and-phones.jpg")], { stdio: "ignore" });
