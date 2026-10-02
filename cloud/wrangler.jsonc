@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "everybody-moves",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-06-24",
+  "assets": { "directory": "public", "binding": "ASSETS", "run_worker_first": ["/api/*", "/j/*"] },
+  "ai": { "binding": "AI" },
+  "d1_databases": [{ "binding": "DB", "database_name": "everybody-moves", "database_id": "6de9944c-1948-4e15-84d0-1eb968dd8ed3" }],
+  "observability": { "enabled": true }
+}

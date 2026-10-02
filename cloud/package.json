@@ -1,0 +1,19 @@
+{
+  "name": "everybody-moves-cloud",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Everybody Moves: the session, planner and coach-voice service behind the Fire TV app.",
+  "license": "MIT",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "typescript": "^7.0.2",
+    "wrangler": "4.103.0"
+  }
+}

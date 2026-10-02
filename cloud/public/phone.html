@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Everybody Moves</title>
+<meta name="theme-color" content="#0E1116">
+<style>
+  :root { --bg: #0E1116; --card: #181C24; --line: #2A303C; --text: #F4F1EA; --dim: #A7ADB8; --accent: #FFB547; --me: #FFB547; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 480px; margin: 0 auto; padding: 20px 16px 40px; min-height: 100vh; }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .brand { font-weight: 800; letter-spacing: -0.01em; font-size: 18px; }
+  .code { color: var(--dim); font-size: 14px; }
+  h1 { font-size: 28px; line-height: 1.15; margin: 8px 0 6px; letter-spacing: -0.01em; }
+  p.sub { color: var(--dim); margin: 0 0 18px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button { font: inherit; color: inherit; background: var(--card); border: 2px solid var(--line); border-radius: 16px; padding: 16px 12px; cursor: pointer; text-align: center; }
+  button:active { transform: scale(0.98); }
+  button.on { border-color: var(--me); background: color-mix(in srgb, var(--me) 18%, var(--card)); }
+  .who { display: flex; flex-direction: column; align-items: center; gap: 8px; font-weight: 700; font-size: 18px; padding: 18px 10px; }
+  .dot { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #111; font-weight: 800; font-size: 18px; }
+  .row5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .row5 button { padding: 14px 4px; font-size: 14px; font-weight: 600; }
+  .row5 button b { display: block; font-size: 22px; margin-bottom: 2px; }
+  .label { font-weight: 700; margin: 22px 0 10px; }
+  .primary { width: 100%; margin-top: 26px; background: var(--me); color: #111; border-color: var(--me); font-weight: 800; font-size: 19px; padding: 18px; }
+  .primary:disabled { opacity: 0.4; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; margin-top: 14px; }
+  .kicker { text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px; color: var(--dim); font-weight: 700; }
+  .big { font-size: 30px; font-weight: 800; line-height: 1.1; margin: 6px 0; }
+  .mine { color: var(--me); }
+  .timer { font-size: 64px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .bar { height: 8px; background: var(--line); border-radius: 8px; overflow: hidden; margin-top: 10px; }
+  .bar > i { display: block; height: 100%; background: var(--me); width: 0; transition: width 0.9s linear; }
+  ul.plan { list-style: none; padding: 0; margin: 10px 0 0; }
+  ul.plan li { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+  ul.plan li span:last-child { color: var(--dim); text-align: right; }
+  .why { color: var(--dim); font-size: 14px; }
+  .muted { color: var(--dim); }
+  .err { color: #FF8A8A; margin-top: 14px; }
+  .center { text-align: center; }
+</style>
+</head>
+<body>
+<main id="app"><p class="muted">Loading…</p></main>
+<script>
+const code = (location.pathname.match(/\/j\/([A-Za-z]{4})/) || [])[1]?.toUpperCase();
+const app = document.getElementById("app");
+const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+let me = store.get("em-" + code);
+let state = null, skew = 0, draft = { energy: null, sore: [] }, view = "";
+const ENERGY = [["1", "Wiped"], ["2", "Low"], ["3", "OK"], ["4", "Good"], ["5", "Great"]];
+const SORE = ["knees", "back", "shoulders", "wrists"];
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+
+async function api(path, body) {
+  const r = await fetch("/api/session/" + code + path, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || "Something went wrong");
+  return j;
+}
+
+// Same clock as the TV: block index from the server's start time, pauses and skips.
+function position(plan, t, now) {
+  if (!t.started_at) return { index: 0, remaining: plan.blocks[0].seconds, done: false };
+  let elapsed = ((t.paused_at ?? now) - t.started_at - t.paused_ms + t.offset_ms) / 1000;
+  for (let i = 0; i < plan.blocks.length; i++) {
+    if (elapsed < plan.blocks[i].seconds) return { index: i, remaining: Math.ceil(plan.blocks[i].seconds - elapsed), done: false };
+    elapsed -= plan.blocks[i].seconds;
+  }
+  return { index: plan.blocks.length - 1, remaining: 0, done: true };
+}
+
+const member = () => state?.members.find((m) => m.id === me);
+const mine = (block) => block.per_member.find((v) => v.member_id === me);
+const presenceOf = (id) => state?.presence.find((p) => p.member_id === id);
+
+function shell(inner) {
+  const m = member();
+  if (m) document.documentElement.style.setProperty("--me", m.color);
+  app.innerHTML = `<header><span class="brand">Everybody Moves</span><span class="code">Room ${esc(code)}${m ? " · " + esc(m.name) : ""}</span></header>${inner}`;
+}
+
+function render() {
+  if (!state) return;
+  const m = member();
+  const p = m && presenceOf(m.id);
+  const plan = state.plan;
+  const pos = plan && state.timing.started_at ? position(plan, state.timing, Date.now() + skew) : null;
+  let key;
+  if (!m) key = "who";
+  else if (state.status === "done") key = "done";
+  else if (pos?.done) key = p?.rating ? "rated" : "rate";
+  else if (state.status === "live") key = "live";
+  else if (!p || p.energy == null) key = "checkin";
+  else if (state.status === "ready") key = "ready";
+  else key = "waiting";
+
+  if (key === "live") return renderLive(m, plan, pos);
+  if (key === view && key !== "ready" && key !== "done") return; // keep form state while polling
+  view = key;
+  if (key === "who") {
+    shell(`<h1>Who's working out?</h1><p class="sub">Tap your name. Your check-in stays on your phone and the TV.</p>
+      <div class="grid">${state.members.map((x) => `<button class="who" data-id="${x.id}"><span class="dot" style="background:${x.color}">${esc(x.name[0])}</span>${esc(x.name)}</button>`).join("")}</div>`);
+    app.querySelectorAll("[data-id]").forEach((b) => b.onclick = async () => {
+      me = b.dataset.id; store.set("em-" + code, me);
+      try { await api("/present", { member: me, via: "phone" }); } catch (e) {}
+      view = ""; await poll();
+    });
+  } else if (key === "checkin") {
+    shell(`<h1>Quick check-in</h1><p class="sub">The coach uses this to pick your version of each move.</p>
+      <div class="label">How's your energy?</div>
+      <div class="row5">${ENERGY.map(([v, l]) => `<button data-e="${v}" class="${draft.energy == v ? "on" : ""}"><b>${v}</b>${l}</button>`).join("")}</div>
+      <div class="label">Anything sore today?</div>
+      <div class="grid">${SORE.map((s) => `<button data-s="${s}" class="${draft.sore.includes(s) ? "on" : ""}">${s[0].toUpperCase() + s.slice(1)}</button>`).join("")}</div>
+      <button class="primary" id="go" ${draft.energy ? "" : "disabled"}>I'm in</button><div class="err" id="err"></div>`);
+    app.querySelectorAll("[data-e]").forEach((b) => b.onclick = () => { draft.energy = Number(b.dataset.e); view = ""; render(); });
+    app.querySelectorAll("[data-s]").forEach((b) => b.onclick = () => { const s = b.dataset.s; draft.sore = draft.sore.includes(s) ? draft.sore.filter((x) => x !== s) : [...draft.sore, s]; view = ""; render(); });
+    app.querySelector("#go").onclick = async () => {
+      try { await api("/checkin", { member: me, energy: draft.energy, sore: draft.sore, via: "phone" }); view = ""; await poll(); }
+      catch (e) { app.querySelector("#err").textContent = e.message; }
+    };
+  } else if (key === "waiting") {
+    shell(`<div class="card center"><div class="kicker">You're in</div><div class="big">Watch the TV</div><p class="muted">The coach is waiting for everyone to check in.</p></div>`);
+  } else if (key === "ready") {
+    const work = plan.blocks.filter((b) => b.kind === "work");
+    const seen = new Set(); const rows = [];
+    for (const b of work) { if (seen.has(b.move_id)) continue; seen.add(b.move_id); const v = mine(b); if (v) rows.push(`<li><span>${esc(b.move)}</span><span class="mine">${esc(v.name)}${v.why ? `<br><span class="why">${esc(v.why)}</span>` : ""}</span></li>`); }
+    shell(`<div class="card"><div class="kicker">Today, ${plan.minutes} minutes · ${esc(plan.focus)}</div><div class="big">Your versions</div><ul class="plan">${rows.join("")}</ul></div><p class="muted center">Starts from the TV remote.</p>`);
+  } else if (key === "rate") {
+    shell(`<h1>How was that for you?</h1><p class="sub">Your answer sets your level for next time.</p>
+      <div style="display:grid;gap:10px">${[["easy", "Easy"], ["right", "Just right"], ["hard", "Hard"]].map(([v, l]) => `<button data-r="${v}" style="padding:20px;font-size:20px;font-weight:700">${l}</button>`).join("")}</div><div class="err" id="err"></div>`);
+    app.querySelectorAll("[data-r]").forEach((b) => b.onclick = async () => {
+      try { await api("/rate", { member: me, rating: b.dataset.r }); view = ""; await poll(); } catch (e) { app.querySelector("#err").textContent = e.message; }
+    });
+  } else if (key === "rated") {
+    shell(`<div class="card center"><div class="kicker">Thanks</div><div class="big">Nice work, ${esc(m.name)}</div><p class="muted">The TV shows what changes for next time.</p></div>`);
+  } else if (key === "done") {
+    const s = state.summary || { changes: [] };
+    const myChanges = s.changes.filter((c) => c.startsWith(m.name));
+    shell(`<div class="card"><div class="kicker">Done</div><div class="big">${s.completed_blocks} of ${s.planned_blocks} work blocks</div>
+      ${myChanges.length ? myChanges.map((c) => `<p>${esc(c[0].toUpperCase() + c.slice(1))}.</p>`).join("") : `<p class="muted">Same level next time.</p>`}</div>`);
+  }
+}
+
+function renderLive(m, plan, pos) {
+  const b = plan.blocks[pos.index];
+  const v = mine(b) || b.per_member[0];
+  const next = plan.blocks[pos.index + 1];
+  const nv = next && (mine(next) || next.per_member[0]);
+  const label = { warmup: "Warm-up", work: "Go", rest: "Rest · next up", cooldown: "Cool-down" }[b.kind];
+  const pct = Math.max(0, Math.min(100, 100 * (1 - pos.remaining / b.seconds)));
+  if (view !== "live") {
+    view = "live";
+    shell(`<div class="card"><div class="kicker" id="lb"></div><div class="big mine" id="nm"></div><div id="cue" class="muted"></div>
+      <div class="timer" id="tm"></div><div class="bar"><i id="br"></i></div></div><div class="card"><div class="kicker">Then</div><div id="nx"></div></div>`);
+  }
+  app.querySelector("#lb").textContent = state.timing.paused_at ? "Paused" : label;
+  app.querySelector("#nm").textContent = v.name;
+  app.querySelector("#cue").textContent = v.cue + (v.why ? " · " + v.why : "");
+  app.querySelector("#tm").textContent = String(pos.remaining);
+  app.querySelector("#br").style.width = pct + "%";
+  app.querySelector("#nx").textContent = nv ? nv.name : "Last one";
+}
+
+async function poll() {
+  try {
+    const t0 = Date.now();
+    state = await api("");
+    skew = state.server_now - Math.round((t0 + Date.now()) / 2);
+    if (me && !state.members.some((x) => x.id === me)) me = null;
+    render();
+  } catch (e) {
+    app.innerHTML = `<main><h1>Room not found</h1><p class="muted">${esc(e.message)}. Check the code on the TV.</p></main>`;
+  }
+}
+
+if (!code) app.innerHTML = "<h1>Open the link shown on the TV.</h1>";
+else { poll(); setInterval(poll, 1000); setInterval(() => state?.status === "live" && render(), 250); }
+</script>
+</body>
+</html>
