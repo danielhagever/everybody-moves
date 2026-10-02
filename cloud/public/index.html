@@ -1,1 +1,70 @@
-<!doctype html><title>Everybody Moves</title><p>Everybody Moves</p>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Everybody Moves</title>
+<meta name="description" content="One family workout on Fire TV where each person gets their own version of every move.">
+<meta name="theme-color" content="#0E1116">
+<style>
+  :root { --bg: #0E1116; --panel: #171B23; --line: #2C3240; --text: #F4F1EA; --dim: #A3A9B5; --amber: #FFB547; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 48px 16px 64px; }
+  .kicker { color: var(--amber); font-weight: 800; letter-spacing: .12em; text-transform: uppercase; font-size: 13px; }
+  h1 { font-size: clamp(34px, 6vw, 52px); line-height: 1.08; margin: 10px 0 14px; letter-spacing: -.02em; }
+  h2 { font-size: 22px; margin: 40px 0 10px; }
+  p.lead { color: var(--dim); font-size: 19px; margin: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; margin-top: 16px; }
+  ol, ul { padding-left: 22px; margin: 8px 0; }
+  li { margin: 6px 0; }
+  code { background: #20252F; border-radius: 6px; padding: 2px 6px; font-size: 15px; }
+  pre { background: #20252F; border-radius: 10px; padding: 14px; overflow-x: auto; font-size: 14px; }
+  a { color: var(--amber); }
+  .join { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .join input { flex: 1; min-width: 160px; font: inherit; font-size: 20px; letter-spacing: .2em; text-transform: uppercase; padding: 12px 14px; border-radius: 12px; border: 2px solid var(--line); background: #0B0E13; color: var(--text); }
+  .join button { font: inherit; font-weight: 800; padding: 12px 22px; border-radius: 12px; border: 0; background: var(--amber); color: #1A1205; cursor: pointer; }
+  .muted { color: var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <div class="kicker">Fire TV · Vega OS</div>
+  <h1>Everybody Moves</h1>
+  <p class="lead">One family workout on the TV, where each person gets their own version of every move: Grandpa's chair squat, Maya's knee-friendly glute bridge, Lily's jump squat, all at the same time.</p>
+
+  <div class="card">
+    <strong>Joining a session?</strong> Type the four-letter room code shown on the TV.
+    <form class="join" onsubmit="event.preventDefault(); const c=this.code.value.trim().toUpperCase(); if(/^[A-Z]{4}$/.test(c)) location.href='/j/'+c;">
+      <input name="code" maxlength="4" autocomplete="off" placeholder="ROOM" aria-label="Room code">
+      <button type="submit">Join</button>
+    </form>
+  </div>
+
+  <h2>How it works</h2>
+  <ol>
+    <li>The TV shows a QR code. Everyone checks in from their phone: energy from 1 to 5, and anything sore (knees, back, shoulders, wrists). People without a phone join with the remote.</li>
+    <li>The coach plans today's session from those check-ins and the household's history: the focus is whatever was trained least recently, and the length follows the family's pattern at this time of day.</li>
+    <li>During the workout, the TV shows each person's version of the move, with a reason ("easy on the knees"). Phones show your own version, the same timer, and captions of the coach.</li>
+    <li>Afterwards, everyone rates it. "Easy" twice in a row moves you up a level; "hard" moves you down.</li>
+  </ol>
+
+  <h2>Try the TV app</h2>
+  <p class="muted">The app runs on Fire TV's Vega OS. With the <a href="https://developer.amazon.com/docs/vega/latest/install-vega-sdk.html">Vega SDK</a> installed:</p>
+<pre>git clone https://github.com/danielhagever/everybody-moves
+cd everybody-moves/tv
+npm install
+npm run build:debug
+vega virtual-device start
+vega run-app build/aarch64-debug/everybodymoves_aarch64.vpkg com.glitchbound.everybodymoves.main -d VirtualDevice</pre>
+  <p class="muted">It opens on a sample household with two weeks of history. On the "Who's working out?" screen, set <em>Pace: demo (5x)</em> to see a whole session in under two minutes, and open the room's link on your phone to check in.</p>
+
+  <h2>Built with</h2>
+  <ul>
+    <li>React Native for Vega, the Vega W3C media AudioPlayer (the coach's voice), react-native-svg (figures, countdown ring, QR code)</li>
+    <li>Cloudflare Workers and D1 (planner, sessions, phone check-in), Workers AI: Llama 4 Scout (the coach's introduction, checked by rules before it's spoken) and Deepgram Aura-2 (voice)</li>
+  </ul>
+  <p class="muted" style="margin-top:28px">Code: <a href="https://github.com/danielhagever/everybody-moves">github.com/danielhagever/everybody-moves</a> · General fitness guidance, not medical advice.</p>
+</main>
+</body>
+</html>
