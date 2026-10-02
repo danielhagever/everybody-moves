@@ -58,3 +58,11 @@ CREATE TABLE IF NOT EXISTS events (
   text TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS events_hid ON events(hid, at);
+
+-- What the coach said, when (shown as captions on phones).
+CREATE TABLE IF NOT EXISTS lines (
+  session_id TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  text TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS lines_session ON lines(session_id, at);

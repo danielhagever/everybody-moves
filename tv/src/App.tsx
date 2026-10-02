@@ -19,9 +19,10 @@ type Screen = 'loading' | 'home' | 'lobby' | 'plan' | 'workout' | 'rate' | 'summ
 // common one are named, so the line stays short.
 export function cueFor(b: Block, next: Block | undefined, people: Member[]): string {
   if (b.kind === 'rest') return `Rest. Next up, ${b.move.toLowerCase()}.`;
-  const counts = new Map<string, number>();
-  for (const v of b.per_member) counts.set(v.name, (counts.get(v.name) ?? 0) + 1);
-  const common = [...counts.entries()].sort((a, c) => c[1] - a[1])[0]?.[0];
+  // The "common" version is the one most people do; on a tie, the one nobody had adjusted.
+  const score = new Map<string, number>();
+  for (const v of b.per_member) score.set(v.name, (score.get(v.name) ?? 0) + 1 + (v.why ? 0 : 0.1));
+  const common = [...score.entries()].sort((a, c) => c[1] - a[1])[0]?.[0];
   const callouts = b.per_member
     .filter(v => v.name !== common)
     .map(v => `${people.find(m => m.id === v.member_id)?.name ?? ''}, ${v.name.toLowerCase()}`)
@@ -53,6 +54,9 @@ export const App = () => {
     return () => clearInterval(id);
   }, []);
   useEffect(() => voice.onLine(setCoachLine), []);
+  const codeRef = useRef<string | null>(null);
+  codeRef.current = code;
+  useEffect(() => voice.onSaid(line => codeRef.current && api.said(codeRef.current, line).catch(() => {})), []);
 
   const loadHousehold = useCallback(async (id: string) => {
     setHouse(await api.household(id));

@@ -10,6 +10,8 @@ let busy = false;
 let pending: string | null = null;
 let muted = false;
 const listeners = new Set<(line: string | null) => void>();
+const saidListeners = new Set<(line: string) => void>();
+let current: string | null = null;
 
 export const ttsUrl = (text: string) => `${BASE}/api/tts?t=${encodeURIComponent(text)}`;
 
@@ -19,6 +21,10 @@ function init() {
     ready = player.initialize().then(() => {
       player!.addEventListener('ended', next);
       player!.addEventListener('error', next);
+      // Report the moment a line is actually heard (phones show it as a caption).
+      player!.addEventListener('playing', () => {
+        if (current) saidListeners.forEach(l => l(current!));
+      });
     });
   }
   return ready;
@@ -43,6 +49,7 @@ export async function say(text: string) {
     return;
   }
   busy = true;
+  current = text;
   emit(text);
   try {
     await init();
@@ -71,6 +78,13 @@ export function setMuted(m: boolean) {
 // Warm the server cache so the first time a cue plays it starts right away.
 export function prefetch(lines: string[]) {
   for (const l of [...new Set(lines)]) fetch(ttsUrl(l)).catch(() => {});
+}
+
+export function onSaid(fn: (line: string) => void) {
+  saidListeners.add(fn);
+  return () => {
+    saidListeners.delete(fn);
+  };
 }
 
 export function onLine(fn: (line: string | null) => void) {

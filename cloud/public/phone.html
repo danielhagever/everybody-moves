@@ -41,10 +41,13 @@
   .muted { color: var(--dim); }
   .err { color: #FF8A8A; margin-top: 14px; }
   .center { text-align: center; }
+  #cap { position: fixed; left: 12px; right: 12px; bottom: 14px; background: #20252F; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font-size: 16px; display: none; }
+  #cap b { color: var(--accent); font-weight: 800; margin-right: 6px; }
 </style>
 </head>
 <body>
 <main id="app"><p class="muted">Loading…</p></main>
+<div id="cap" aria-live="polite"></div>
 <script>
 const code = (location.pathname.match(/\/j\/([A-Za-z]{4})/) || [])[1]?.toUpperCase();
 const app = document.getElementById("app");
@@ -102,8 +105,8 @@ function render() {
   if (key === view && key !== "ready" && key !== "done") return; // keep form state while polling
   view = key;
   if (key === "who") {
-    shell(`<h1>Who's working out?</h1><p class="sub">Tap your name. Your check-in stays on your phone and the TV.</p>
-      <div class="grid">${state.members.map((x) => `<button class="who" data-id="${x.id}"><span class="dot" style="background:${x.color}">${esc(x.name[0])}</span>${esc(x.name)}</button>`).join("")}</div>`);
+    shell(`<h1>Who's working out?</h1><p class="sub">Tap your name. Your check-in goes only to the coach on the TV.</p>
+      <div class="grid">${state.members.map((x) => `<button class="who" data-id="${x.id}"><span class="dot" style="background:${x.color}">${esc(x.name.replace("Grandpa ", "")[0])}</span>${esc(x.name)}</button>`).join("")}</div>`);
     app.querySelectorAll("[data-id]").forEach((b) => b.onclick = async () => {
       me = b.dataset.id; store.set("em-" + code, me);
       try { await api("/present", { member: me, via: "phone" }); } catch (e) {}
@@ -172,6 +175,9 @@ async function poll() {
     skew = state.server_now - Math.round((t0 + Date.now()) / 2);
     if (me && !state.members.some((x) => x.id === me)) me = null;
     render();
+    // Captions: whatever the coach just said on the TV.
+    const cap = document.getElementById("cap");
+    if (state.caption) { cap.innerHTML = `<b>Coach</b>${esc(state.caption.text)}`; cap.style.display = "block"; } else cap.style.display = "none";
   } catch (e) {
     app.innerHTML = `<main><h1>Room not found</h1><p class="muted">${esc(e.message)}. Check the code on the TV.</p></main>`;
   }

@@ -7,7 +7,6 @@ const SPEAKER = "thalia";
 export async function speech(env: { AI: Ai }, text: string, force?: string | null): Promise<Response> {
   const clean = text.replace(/\s+/g, " ").trim().slice(0, 600);
   if (!clean) return new Response("empty", { status: 400 });
-  console.log(JSON.stringify({ tts: clean })); // lets the demo recording line the coach's audio up with the screen
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("coach|" + clean));
   const key = new Request("https://tts.cache/everybody-moves/" + [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join(""));
   const cache = (caches as any).default as Cache;

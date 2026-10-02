@@ -103,6 +103,7 @@ export const api = {
   control: (code: string, action: 'start' | 'pause' | 'resume' | 'next' | 'prev' | 'end') => call(`/api/session/${code}/control`, {action}),
   rate: (code: string, member: string, rating: Rating) => call(`/api/session/${code}/rate`, {member, rating}),
   finish: (code: string) => call<{summary: Summary}>(`/api/session/${code}/finish`, {}),
+  said: (code: string, text: string) => call(`/api/session/${code}/said`, {text}),
 };
 
 // Same rule as the server and the phones: where the session is, from the shared start time.

@@ -79,7 +79,11 @@ async function householdView(env: Env, hid: string) {
 }
 
 async function sessionView(env: Env, s: SessionRow) {
-  const [ms, pr] = await Promise.all([db.members(env, s.hid), db.presence(env, s.id)]);
+  const [ms, pr, line] = await Promise.all([
+    db.members(env, s.hid),
+    db.presence(env, s.id),
+    env.DB.prepare("SELECT at, text FROM lines WHERE session_id = ? ORDER BY at DESC LIMIT 1").bind(s.id).first<{ at: number; text: string }>(),
+  ]);
   const plan = db.planOf(s);
   const t = db.now();
   const pos = plan && s.status === "live" ? position(plan, db.timingOf(s), t) : null;
@@ -90,6 +94,7 @@ async function sessionView(env: Env, s: SessionRow) {
     plan, coach: s.coach ? JSON.parse(s.coach) : null,
     timing: db.timingOf(s), position: pos,
     summary: s.summary ? JSON.parse(s.summary) : null,
+    caption: line && t - line.at < 8000 ? line : null,
   };
 }
 
@@ -210,6 +215,8 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   if (!s) return bad("No session with that code.", 404);
   const action = m[2] ?? "";
   if (!action && req.method === "GET") return json(await sessionView(env, s));
+  if (action === "lines" && req.method === "GET")
+    return json((await env.DB.prepare("SELECT at, text FROM lines WHERE session_id = ? ORDER BY at").bind(s.id).all()).results);
   if (req.method !== "POST") return bad("Use POST.", 405);
   const b = await body(req);
   const memberOk = async () => (await db.members(env, s.hid)).find((x: Member) => x.id === b.member);
@@ -243,6 +250,13 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     }
     case "finish":
       return finish(env, s);
+    case "said": {
+      // The TV reports each line the coach starts speaking; phones show it as a caption.
+      const text = String(b.text ?? "").replace(/\s+/g, " ").trim().slice(0, 400);
+      if (!text) return bad("Nothing said.");
+      await env.DB.prepare("INSERT INTO lines (session_id, at, text) VALUES (?, ?, ?)").bind(s.id, db.now(), text).run();
+      return json({ ok: true });
+    }
   }
   return bad("Not found.", 404);
 }
