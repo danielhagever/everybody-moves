@@ -39,8 +39,9 @@ for (const name of ["maya", "lily"]) {
 }
 console.log({ firstPress, firstChange, tvOffset, phoneOffset });
 
-// 2. What to show (timeline seconds). The middle of the workout is skipped in the edit only
-// where the app itself was skipped with the remote.
+// 2. What to show (timeline seconds). The edit keeps the warm-up and the part around the skip,
+// and cuts the workout between them (plank and jacks) to stay under three minutes; the title
+// card says so.
 const tHome = Math.max(0, firstPress - 5.5);
 const tLive = ev(/workout live/);
 const tSkip = ev(/skipped ahead/);
@@ -139,7 +140,7 @@ const titlePng = await still("title", `<div style="height:100%;display:flex;flex
   <div style="color:#FFB547;font-weight:800;letter-spacing:.14em;font-size:26px">FIRE TV · VEGA OS</div>
   <div style="font-size:104px;font-weight:800;letter-spacing:-.02em;margin-top:18px">Everybody Moves</div>
   <div style="font-size:44px;color:#C9CED8;margin-top:18px">One family workout. Everyone's own version of every move.</div>
-  <div style="font-size:26px;color:#8A91A0;margin-top:48px">Recorded on the Vega Virtual Device, with the phone page in two phone-sized browsers · demo pace (5x), waits shortened</div></div>`);
+  <div style="font-size:26px;color:#8A91A0;margin-top:48px">Recorded on the Vega Virtual Device, with the phone page in two phone-sized browsers.<br>Demo pace (5x); waits and part of the workout are cut.</div></div>`);
 const endPng = await still("end", `<div style="height:100%;display:flex;flex-direction:column;justify-content:center;padding:0 140px">
   <div style="color:#FFB547;font-weight:800;letter-spacing:.14em;font-size:24px">HOW IT'S BUILT</div>
   <div style="font-size:64px;font-weight:800;margin:16px 0 30px">Everybody Moves</div>
