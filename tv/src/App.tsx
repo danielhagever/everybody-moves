@@ -2,7 +2,7 @@
 // every move. The TV runs the session; phones check in by QR code; the service plans the
 // session from the household's history and today's check-ins.
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Dimensions, Text, View} from 'react-native';
+import {Text, View} from 'react-native';
 import {BackHandler, useTVEventHandler} from '@amazon-devices/react-native-kepler';
 import {api, HouseholdView, Member, position, Rating, Session, Summary} from './api';
 import * as voice from './voice';
@@ -41,6 +41,7 @@ export const App = () => {
   useEffect(() => voice.onLine(setCoachLine), []);
   const codeRef = useRef<string | null>(null);
   codeRef.current = code;
+  useEffect(() => voice.setRoom(code), [code]);
   useEffect(() => voice.onSaid(line => codeRef.current && api.said(codeRef.current, line).catch(() => {})), []);
 
   const loadHousehold = useCallback(async (id: string) => {
@@ -61,9 +62,6 @@ export const App = () => {
   }, [loadHousehold]);
 
   useEffect(() => {
-    // Logged once so the layout-unit size can be checked in the device log.
-    const w = Dimensions.get('window');
-    console.log(`[everybody-moves] window ${w.width}x${w.height} scale ${w.scale}`);
     boot();
   }, [boot]);
 
@@ -129,8 +127,13 @@ export const App = () => {
 
   const toggle = async (m: Member, present: boolean) => {
     if (!code) return;
-    await api.present(code, m.id, present).catch(() => {});
-    setSession(await api.session(code));
+    setError(null);
+    try {
+      await api.present(code, m.id, present);
+      setSession(await api.session(code));
+    } catch (e: any) {
+      setError(String(e?.message ?? e));
+    }
   };
 
   const makePlan = async () => {
@@ -157,20 +160,24 @@ export const App = () => {
   const control = async (a: 'start' | 'pause' | 'resume' | 'next' | 'prev' | 'end') => {
     if (!code) return;
     if (a === 'end' || a === 'start') voice.stop();
-    if (a === 'start') {
-      voice.stop();
-      spokenFor.current = '';
+    if (a === 'start') spokenFor.current = '';
+    try {
+      await api.control(code, a);
+      setSession(await api.session(code));
+      if (a === 'start') setScreen('workout');
+    } catch {
+      // The once-a-second refresh shows the real state; a missed press can simply be repeated.
     }
-    await api.control(code, a).catch(() => {});
-    const s2 = await api.session(code);
-    setSession(s2);
-    if (a === 'start') setScreen('workout');
   };
 
   const rate = async (member: string, r: Rating) => {
     if (!code) return;
-    await api.rate(code, member, r).catch(() => {});
-    setSession(await api.session(code));
+    try {
+      await api.rate(code, member, r);
+      setSession(await api.session(code));
+    } catch {
+      // Shown on the next refresh, or the press can be repeated.
+    }
   };
 
   const finish = async () => {

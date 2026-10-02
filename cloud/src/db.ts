@@ -38,6 +38,7 @@ export interface SessionRow {
 }
 
 export async function sessionByCode(env: Env, code: string) {
+  if (!/^[A-Za-z]{4}$/.test(code)) return null;
   return env.DB.prepare("SELECT * FROM sessions WHERE code = ? ORDER BY created_at DESC LIMIT 1").bind(code.toUpperCase()).first<SessionRow>();
 }
 

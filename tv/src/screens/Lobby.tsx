@@ -48,7 +48,7 @@ export function Lobby({session, joinUrl, demoPace, onTogglePace, onToggle, onPla
       <View style={{width: u(560), marginRight: u(64)}}>
         <Text style={s.kicker}>Room {session.code}</Text>
         <Text style={s.h1}>Who's working out?</Text>
-        <Text style={[s.dim, {marginTop: u(12)}]}>Scan to check in from your phone. Your energy and anything sore stay between you and the coach.</Text>
+        <Text style={[s.dim, {marginTop: u(12)}]}>Scan to check in from your phone: your energy today, and anything sore. The coach uses it to pick everyone's version of each move.</Text>
         <View style={{marginTop: u(30), alignSelf: 'flex-start'}}>
           <QR value={joinUrl} size={u(300)} />
         </View>

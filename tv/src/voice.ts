@@ -23,7 +23,12 @@ function report() {
   }
 }
 
-export const ttsUrl = (text: string) => `${BASE}/api/tts?t=${encodeURIComponent(text)}`;
+// The service only voices lines for an open room, so every request carries the room code.
+let room = '';
+export const setRoom = (code: string | null) => {
+  room = code ?? '';
+};
+export const ttsUrl = (text: string) => `${BASE}/api/tts?s=${room}&t=${encodeURIComponent(text)}`;
 
 function init() {
   if (!ready) {

@@ -61,7 +61,7 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
 async function api(path, body) {
   const r = await fetch("/api/session/" + code + path, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {});
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || "Something went wrong");
+  if (!r.ok) { const e = new Error(j.error || "Something went wrong"); e.status = r.status; throw e; }
   return j;
 }
 
@@ -105,7 +105,7 @@ function render() {
   if (key === view && key !== "ready" && key !== "done") return; // keep form state while polling
   view = key;
   if (key === "who") {
-    shell(`<h1>Who's working out?</h1><p class="sub">Tap your name. Your check-in goes only to the coach on the TV.</p>
+    shell(`<h1>Who's working out?</h1><p class="sub">Tap your name, then tell the coach how you feel today.</p>
       <div class="grid">${state.members.map((x) => `<button class="who" data-id="${x.id}"><span class="dot" style="background:${x.color}">${esc(x.name.replace("Grandpa ", "")[0])}</span>${esc(x.name)}</button>`).join("")}</div>`);
     app.querySelectorAll("[data-id]").forEach((b) => b.onclick = async () => {
       me = b.dataset.id; store.set("em-" + code, me);
@@ -182,7 +182,14 @@ async function poll() {
     const cap = document.getElementById("cap");
     if (state.caption) { cap.innerHTML = `<b>Coach</b>${esc(state.caption.text)}`; cap.style.display = "block"; } else cap.style.display = "none";
   } catch (e) {
-    app.innerHTML = `<main><h1>Room not found</h1><p class="muted">${esc(e.message)}. Check the code on the TV.</p></main>`;
+    if (e.status === 404) {
+      app.innerHTML = `<h1>Room not found</h1><p class="muted">${esc(e.message)} Check the code on the TV.</p>`;
+      view = "";
+    } else {
+      // A dropped request (weak Wi-Fi): keep the screen and say so; the next poll recovers.
+      document.getElementById("cap").innerHTML = "<b>Reconnecting</b>Checking in with the TV…";
+      document.getElementById("cap").style.display = "block";
+    }
   }
 }
 

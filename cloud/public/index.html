@@ -35,10 +35,11 @@
 
   <div class="card">
     <strong>Joining a session?</strong> Type the four-letter room code shown on the TV.
-    <form class="join" onsubmit="event.preventDefault(); const c=this.code.value.trim().toUpperCase(); if(/^[A-Z]{4}$/.test(c)) location.href='/j/'+c;">
+    <form class="join" onsubmit="event.preventDefault(); const c=this.code.value.trim().toUpperCase(); if(/^[A-Z]{4}$/.test(c)) location.href='/j/'+c; else document.getElementById('codehint').textContent='The room code is four letters, like KCHJ.';">
       <input name="code" maxlength="4" autocomplete="off" placeholder="ROOM" aria-label="Room code">
       <button type="submit">Join</button>
     </form>
+    <div id="codehint" class="muted" style="margin-top:8px;font-size:15px" aria-live="polite"></div>
   </div>
 
   <h2>How it works</h2>

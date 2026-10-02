@@ -59,7 +59,7 @@ async function seed(env: Env) {
     const lp = db.localParts(home.tz, at);
     stmts.push(env.DB.prepare(
       "INSERT INTO sessions (id, hid, code, status, started_at, planned_blocks, completed_blocks, focus, weekday, local_hour, created_at, finished_at) VALUES (?, ?, ?, 'done', ?, ?, ?, ?, ?, ?, ?, ?)",
-    ).bind(sid, hid, "PAST", at, p.planned, p.done, p.focus, lp.weekday, lp.hour, at, at + p.done * 60_000));
+    ).bind(sid, hid, "0000", at, p.planned, p.done, p.focus, lp.weekday, lp.hour, at, at + p.done * 60_000)); // "0000" can't be addressed as a room
     ids.forEach((mid, i) => stmts.push(env.DB.prepare("INSERT INTO presence (session_id, member_id, present, via, energy, sore, rating, updated_at) VALUES (?, ?, 1, 'tv', 3, '[]', ?, ?)").bind(sid, mid, p.ratings[i], at)));
   }
   const lastDay = new Intl.DateTimeFormat("en-US", { timeZone: home.tz, weekday: "long" }).format(new Date(t - 2 * DAY));
@@ -128,6 +128,9 @@ async function makePlan(env: Env, s: SessionRow, pace: number) {
   const plan: Plan = buildPlan(ms, db.checkinsOf(pr), hist, lp.hour);
   if (pace !== 1) for (const b of plan.blocks) b.seconds = Math.max(4, Math.round(b.seconds / pace));
   const coach = await coachIntro(env, ms, plan);
+  // Make the introduction's audio now, so the TV starts speaking the moment the plan appears
+  // (otherwise the voice is generated on request: several seconds of silence). Capped at 10 s.
+  await Promise.race([speech(env, coach.text).catch(() => null), new Promise((r) => setTimeout(r, 10_000))]);
   await env.DB.prepare("UPDATE sessions SET status = 'ready', plan = ?, coach = ?, pace = ?, planned_blocks = ?, focus = ?, weekday = ?, local_hour = ? WHERE id = ?")
     .bind(JSON.stringify(plan), JSON.stringify(coach), pace, plan.blocks.filter((b) => b.kind === "work").length, plan.focus, lp.weekday, lp.hour, s.id).run();
   return { ok: true };
@@ -191,7 +194,13 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
   const p = url.pathname;
   if (req.method === "OPTIONS") return new Response(null, { headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET, POST" } });
 
-  if (p === "/api/tts") return speech(env, url.searchParams.get("t") ?? "");
+  if (p === "/api/tts") {
+    // The coach's voice uses the shared daily AI allowance, so it only speaks for a real room
+    // opened in the last 12 hours.
+    const room = await db.sessionByCode(env, url.searchParams.get("s") ?? "");
+    if (!room || db.now() - room.created_at > 12 * 3_600_000) return bad("The voice is only available inside a session.", 403);
+    return speech(env, url.searchParams.get("t") ?? "");
+  }
 
   if (p === "/api/demo" && req.method === "POST") return json(await seed(env));
 

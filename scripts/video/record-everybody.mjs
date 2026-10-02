@@ -105,10 +105,10 @@ const ready = await waitFor((s) => s.status === "ready");
 mark("plan ready");
 // Let the coach finish the introduction (Start stops it), plus room for one narration line.
 const introMp3 = path.join(OUT, "intro.mp3");
-writeFileSync(introMp3, Buffer.from(await (await fetch(`${BASE}/api/tts?t=${encodeURIComponent(ready.coach.text)}`)).arrayBuffer()));
+writeFileSync(introMp3, Buffer.from(await (await fetch(`${BASE}/api/tts?s=${code}&t=${encodeURIComponent(ready.coach.text)}`)).arrayBuffer()));
 const introLen = parseFloat(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", introMp3]).toString());
 mark(`coach introduction is ${introLen.toFixed(1)} s`);
-await sleep(Math.max(16, introLen + 2.5 + 8.5));
+await sleep(Math.max(12, introLen + 1 + 7));
 await press("ENTER"); // Start
 await waitFor((s) => s.status === "live");
 mark("workout live");

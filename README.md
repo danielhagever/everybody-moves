@@ -102,6 +102,8 @@ scripts/                    run on the virtual device, press remote keys, screen
 
 - Shown on the Vega Virtual Device; not yet tested on a Fire TV stick.
 - Each launch starts a fresh sample household: the React Native for Vega profile used here has no simple key-value storage (see FRICTION_LOG.md). The household's history and levels live in the service.
+- The coach's voice runs on Workers AI's free daily allowance. If it runs out, the TV still shows each line and the phones still get captions. The voice endpoint only answers for a room opened in the last 12 hours.
+- Check-ins are shown on the TV (energy, sore spots), because the plan is shared; nothing is kept beyond the household's sessions.
 - It's general fitness guidance, not medical advice; the "sore" option only swaps in gentler moves.
 
 ## License

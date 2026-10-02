@@ -45,8 +45,12 @@ const tHome = Math.max(0, firstPress - 5.5);
 const tLive = ev(/workout live/);
 const tSkip = ev(/skipped ahead/);
 const tEnd = ev(/^end$/);
+// The planning wait ("The coach is planning…", about 9 s) is cut; the title card says so.
+const tBuild = ev(/^pressed LEFT ENTER$/);
+const tPlanReady = ev(/plan ready/);
 const RANGES = [
-  [tHome, tLive + 24],
+  [tHome, tBuild + 0.5],
+  [tPlanReady - 0.5, tLive + 24],
   [tSkip - 6, tEnd - 4],
 ];
 console.log("ranges", RANGES);
@@ -57,11 +61,14 @@ const tPlan = ev(/plan ready/);
 const tOver = ev(/session over/);
 const tSummary = ev(/^summary$/);
 const coach = tl.lines.map((l) => ({ text: l.text, t: (l.at - tl.T0) / 1000 }));
+const tRemote = ev(/^pressed DOWN ENTER$/);
 const NARRATION = [
   ["This is the real app, running on the Vega Virtual Device, Amazon's Fire TV simulator, with a sample family and two weeks of history.", tHome + 0.6],
-  ["Everyone joins by scanning the code. Maya marks sore knees. Lily feels great. Ben and Grandpa Joe join with the remote.", tRoom + 1.0],
-  ["The plan comes from those check-ins and the family's history. The model only words it, and rules check every reply.", null],
+  ["Everyone joins by scanning the code. Maya marks sore knees, and Lily feels great.", tRoom + 1.0],
+  ["Ben and Grandpa Joe join with the remote, and the coach builds today's plan from the check-ins and the family's history.", tRemote - 0.5],
+  ["The language model only words the plan. Rules check every reply before it's spoken.", null],
   ["Same move, different versions. The phones show each person's own version, the same timer, and captions of the coach.", tLive + 3],
+  ["Every row has its own figure, cue and reason, so nobody has to ask what to do.", tLive + 18],
   ["The remote runs the session. Pause, go back, or skip ahead. This recording runs at demo pace, five times faster.", tSkip - 6],
   ["Afterwards, everyone says how it felt, on a phone or with the remote.", tOver + 1],
 ];
@@ -91,7 +98,7 @@ for (const [i, c] of coach.entries()) {
   const o = toOut(c.t);
   if (o == null) continue;
   const f = path.join(WORK, `coach-${i}.mp3`);
-  if (!existsSync(f)) writeFileSync(f, Buffer.from(await (await fetch(`${BASE}/api/tts?t=${encodeURIComponent(c.text)}`)).arrayBuffer()));
+  if (!existsSync(f)) writeFileSync(f, Buffer.from(await (await fetch(`${BASE}/api/tts?s=${tl.code}&t=${encodeURIComponent(c.text)}`)).arrayBuffer()));
   coachClips.push({ f, o, d: dur(f), text: c.text });
 }
 // Narration clips: if the coach is mid-sentence at the anchor, start right after that line;
@@ -125,7 +132,7 @@ const titlePng = await still("title", `<div style="height:100%;display:flex;flex
   <div style="color:#FFB547;font-weight:800;letter-spacing:.14em;font-size:26px">FIRE TV · VEGA OS</div>
   <div style="font-size:104px;font-weight:800;letter-spacing:-.02em;margin-top:18px">Everybody Moves</div>
   <div style="font-size:44px;color:#C9CED8;margin-top:18px">One family workout. Everyone's own version of every move.</div>
-  <div style="font-size:26px;color:#8A91A0;margin-top:48px">Recorded on the Vega Virtual Device, with the phone page in two phone-sized browsers · demo pace (5x)</div></div>`);
+  <div style="font-size:26px;color:#8A91A0;margin-top:48px">Recorded on the Vega Virtual Device, with the phone page in two phone-sized browsers · demo pace (5x), waits shortened</div></div>`);
 const endPng = await still("end", `<div style="height:100%;display:flex;flex-direction:column;justify-content:center;padding:0 140px">
   <div style="color:#FFB547;font-weight:800;letter-spacing:.14em;font-size:24px">HOW IT'S BUILT</div>
   <div style="font-size:64px;font-weight:800;margin:16px 0 30px">Everybody Moves</div>
