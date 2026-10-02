@@ -1,4 +1,4 @@
-import {cueFor} from '../src/cues';
+import {cueFor, sentences} from '../src/cues';
 import {Block, Member, Plan, position} from '../src/api';
 
 const people: Member[] = [
@@ -36,5 +36,11 @@ describe('session clock', () => {
   });
   it('is over for everyone once the TV ends it', () => {
     expect(position(plan, {started_at: t0, paused_at: null, paused_ms: 0, offset_ms: 0, ended_at: t0 + 5_000}, t0 + 6_000)).toEqual({index: 0, remaining: 0, done: true});
+  });
+});
+
+describe('introduction sentences', () => {
+  it('splits the same way as the service', () => {
+    expect(sentences('Hello Maya. Today is 8 minutes instead of 12! Let\'s go')).toEqual(['Hello Maya.', 'Today is 8 minutes instead of 12!', "Let's go"]);
   });
 });

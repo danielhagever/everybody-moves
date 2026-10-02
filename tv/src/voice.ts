@@ -1,14 +1,14 @@
 // The coach's voice, played through Vega's W3C media stack (AudioPlayer). Lines are spoken one
-// at a time; a newer line replaces anything still waiting so the coach never falls behind the
-// timer. Audio comes from the service's /api/tts (Deepgram Aura-2, cached per sentence).
+// at a time. A new cue replaces anything still waiting, so the coach never falls behind the
+// timer; the introduction is queued sentence by sentence. Audio comes from the service's
+// /api/tts (Deepgram Aura-2, cached per sentence).
 import {AudioPlayer} from '@amazon-devices/react-native-w3cmedia';
 import {BASE} from './api';
 
 let player: AudioPlayer | null = null;
 let ready: Promise<void> | null = null;
 let busy = false;
-let pending: string | null = null;
-let muted = false;
+let queue: string[] = [];
 const listeners = new Set<(line: string | null) => void>();
 const saidListeners = new Set<(line: string) => void>();
 let current: string | null = null;
@@ -52,18 +52,34 @@ function emit(line: string | null) {
 
 async function next() {
   busy = false;
-  const line = pending;
-  pending = null;
+  const line = queue.shift();
   emit(null);
-  if (line) await say(line);
+  if (line) await play(line);
 }
 
+// A cue: replaces whatever is still waiting.
 export async function say(text: string) {
-  if (muted || !text) return;
+  if (!text) return;
   if (busy) {
-    pending = text;
+    queue = [text];
     return;
   }
+  await play(text);
+}
+
+// Several lines in order (the introduction): fetch them all ahead, then play one after another.
+export async function sayAll(lines: string[]) {
+  if (!lines.length) return;
+  prefetch(lines.slice(1));
+  if (busy) {
+    queue = [...lines];
+    return;
+  }
+  queue = lines.slice(1);
+  await play(lines[0]);
+}
+
+async function play(text: string) {
   busy = true;
   current = text;
   reported = false;
@@ -80,7 +96,7 @@ export async function say(text: string) {
 }
 
 export function stop() {
-  pending = null;
+  queue = [];
   try {
     player?.pause();
   } catch {
@@ -88,11 +104,6 @@ export function stop() {
   }
   busy = false;
   emit(null);
-}
-
-export function setMuted(m: boolean) {
-  muted = m;
-  if (m) stop();
 }
 
 // Warm the server cache so the first time a cue plays it starts right away.

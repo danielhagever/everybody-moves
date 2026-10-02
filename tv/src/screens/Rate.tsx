@@ -6,7 +6,7 @@ import {Avatar, C, FocusButton, s, u} from '../ui/kit';
 const WORDS: Record<Rating, string> = {easy: 'Easy', right: 'Just right', hard: 'Hard'};
 
 // After the last block: everyone says how it felt, on their phone or with the remote.
-export function Rate({session, onRate, onFinish, busy}: {session: Session; onRate: (member: string, r: Rating) => void; onFinish: () => void; busy: boolean}) {
+export function Rate({session, onRate, onFinish, busy, error}: {session: Session; onRate: (member: string, r: Rating) => void; onFinish: () => void; busy: boolean; error: string | null}) {
   const people = session.members.filter(m => session.presence.some(p => p.member_id === m.id && p.present));
   const done = people.filter(m => session.presence.find(p => p.member_id === m.id)?.rating).length;
   return (
@@ -40,6 +40,7 @@ export function Rate({session, onRate, onFinish, busy}: {session: Session; onRat
         <FocusButton testID="finish" label={busy ? 'Saving…' : 'See what changes for next time'} tone="primary" onPress={() => !busy && onFinish()} />
         <Text style={[s.dim, {marginLeft: u(28)}]}>{done} of {people.length} answered</Text>
       </View>
+      {error ? <Text style={[s.dim, {color: C.red, marginTop: u(12)}]}>{error}</Text> : null}
     </View>
   );
 }

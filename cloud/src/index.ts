@@ -3,7 +3,7 @@ import * as db from "./db";
 import type { Env, SessionRow } from "./db";
 import { adapt, blockStart, buildPlan, completedWork, pickMinutes, position, SORE_AREAS } from "./plan";
 import type { Member, Plan, Rating } from "./plan";
-import { coachIntro } from "./coach";
+import { coachIntro, sentences } from "./coach";
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), {
@@ -11,6 +11,18 @@ const json = (data: unknown, status = 200) =>
     headers: { "content-type": "application/json", "cache-control": "no-store", "access-control-allow-origin": "*" },
   });
 const bad = (msg: string, status = 400) => json({ error: msg }, status);
+
+// A simple per-address, per-hour counter kept in the edge cache (approximate, which is enough to
+// stop a runaway script from filling the free database).
+async function allow(req: Request, what: string, perHour: number): Promise<boolean> {
+  const ip = req.headers.get("cf-connecting-ip") ?? "unknown";
+  const key = new Request(`https://limits.cache/${what}/${ip}/${Math.floor(Date.now() / 3_600_000)}`);
+  const cache = (caches as any).default as Cache;
+  const n = Number((await (await cache.match(key))?.text()) ?? 0);
+  if (n >= perHour) return false;
+  await cache.put(key, new Response(String(n + 1), { headers: { "cache-control": "max-age=3600" } }));
+  return true;
+}
 
 async function body(req: Request): Promise<Record<string, any>> {
   try { return (await req.json()) as Record<string, any>; } catch { return {}; }
@@ -128,11 +140,11 @@ async function makePlan(env: Env, s: SessionRow, pace: number) {
   const plan: Plan = buildPlan(ms, db.checkinsOf(pr), hist, lp.hour);
   if (pace !== 1) for (const b of plan.blocks) b.seconds = Math.max(4, Math.round(b.seconds / pace));
   const coach = await coachIntro(env, ms, plan);
-  // Make the introduction's audio now, so the TV starts speaking the moment the plan appears
-  // (otherwise the voice is generated on request: several seconds of silence). Capped at 10 s.
-  await Promise.race([speech(env, coach.text).catch(() => null), new Promise((r) => setTimeout(r, 10_000))]);
+  // Make the first sentence's audio now, so the TV starts speaking the moment the plan appears;
+  // the TV fetches the rest while that sentence plays. Capped at 6 s.
+  await Promise.race([speech(env, sentences(coach.text)[0]).catch(() => null), new Promise((r) => setTimeout(r, 6_000))]);
   await env.DB.prepare("UPDATE sessions SET status = 'ready', plan = ?, coach = ?, pace = ?, planned_blocks = ?, focus = ?, weekday = ?, local_hour = ? WHERE id = ?")
-    .bind(JSON.stringify(plan), JSON.stringify(coach), pace, plan.blocks.filter((b) => b.kind === "work").length, plan.focus, lp.weekday, lp.hour, s.id).run();
+    .bind(JSON.stringify(plan), JSON.stringify(coach), pace, plan.blocks.filter((b) => b.kind === "work").length, plan.focus_key, lp.weekday, lp.hour, s.id).run();
   return { ok: true };
 }
 
@@ -202,7 +214,11 @@ async function api(env: Env, req: Request, url: URL): Promise<Response> {
     return speech(env, url.searchParams.get("t") ?? "");
   }
 
-  if (p === "/api/demo" && req.method === "POST") return json(await seed(env));
+  if (p === "/api/demo" && req.method === "POST") {
+    // Each sample household is about 30 database writes; cap how many one address can make.
+    if (!(await allow(req, "demo", 40))) return bad("Too many new households from this address; try again in an hour.", 429);
+    return json(await seed(env));
+  }
 
   if (p === "/api/household") {
     const v = await householdView(env, url.searchParams.get("hid") ?? "");

@@ -50,9 +50,10 @@ export function PlanScreen({session, t, onStart, onBack}: {session: Session; t: 
           );
         })}
       </View>
-      <View style={{flexDirection: 'row', marginTop: u(26)}}>
+      <View style={{flexDirection: 'row', alignItems: 'center', marginTop: u(26)}}>
         <FocusButton testID="start-workout" label="Start" tone="primary" preferred onPress={onStart} style={{paddingHorizontal: u(90)}} />
         <FocusButton label="Back" tone="quiet" small onPress={onBack} style={{marginLeft: u(24)}} />
+        <Text style={[s.dim, {fontSize: u(22), marginLeft: u(32), flex: 1}]}>General fitness guidance, not medical advice. Stop any move that hurts.</Text>
       </View>
     </View>
   );

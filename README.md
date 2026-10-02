@@ -15,13 +15,13 @@ Built for Fire TV on **Vega OS** with React Native for Vega. Shown here on the *
 | Step | On the TV (remote) | On each phone |
 |---|---|---|
 | Home | The household, everyone's level, the last 7 days, and what the coach noticed | |
-| Who's in | A QR code and a room code. Members join from a phone, or with the remote | Pick your name, rate your energy 1 to 5, mark anything sore (knees, back, shoulders, wrists) |
+| Who's working out? | A QR code and a room code. Members join from a phone, or with the remote | Pick your name, rate your energy 1 to 5, mark anything sore (knees, back, shoulders, wrists) |
 | Today's plan | Length, focus, the coach's spoken introduction, and every person's version of each move | "Your versions": your own list |
 | Workout | A demonstrating figure, a countdown ring, and one row per person with their version, cue, and reason ("easy on the knees"). The coach calls out only the differences | Your current move, your cue, the same synced timer, and captions of what the coach just said |
 | Afterwards | "How did that feel?" for everyone; answer with the remote or on a phone | Easy, Just right, or Hard |
 | Next time | Who levels up or down, and what the household's pattern says about the next session | Your own change |
 
-Remote: OK on the focused button; **play/pause** pauses the session; **fast-forward / rewind** skip blocks; **back** pauses during a workout and steps back elsewhere (it never skips the ratings). **End** stops the session for everyone: the phones move to the rating screen too, and only the work blocks actually finished are counted.
+Remote: OK on the focused button; **play/pause** pauses the session; **fast-forward / rewind** skip blocks; **back** pauses during a workout and steps back elsewhere (it never skips the ratings). **End** (press it twice: the first press asks) stops the session for everyone: the phones move to the rating screen too, and only the work blocks actually finished are counted.
 
 If the coach's voice can't play (for example when the free daily allowance for the voice model runs out), the TV still shows the line and every phone still gets the caption. Someone who joins after the plan was made follows the figure on the TV, and the phone says why.
 
@@ -29,7 +29,7 @@ If the coach's voice can't play (for example when the free daily allowance for t
 
 The plan is computed on the server, deterministically, so the TV and every phone agree on it ([`cloud/src/plan.ts`](cloud/src/plan.ts)):
 
-- **Per person, per move:** level 1 to 3 picks the variation; energy 1 or 2 drops one level for today; a sore area swaps in a move that spares it; "no jumping" members never get a jumping version.
+- **Per person, per move:** level 1 to 3 picks the variation; energy 1 or 2 drops one level for today; "no jumping" members never get a jumping version. Every move lists the areas it loads (knees, back, shoulders, wrists), and every substitute lists the areas it spares: if a move loads something sore, the person gets a substitute that spares *all* their sore areas, or sits that move out with easy breathing when none does.
 - **Per household:** the focus (legs, upper body, core) is whatever the household trained least recently. The length comes from the household's own history at this time of day: if most recent sessions around this hour ended early, today is 8 minutes; if every one was finished, 15.
 - **After each session:** "hard" lowers that person's level; "easy" twice in a row raises it.
 
@@ -66,7 +66,7 @@ vega virtual-device start
 vega run-app build/aarch64-debug/everybodymoves_aarch64.vpkg com.glitchbound.everybodymoves.main -d VirtualDevice
 ```
 
-Use `build/x86_64-debug/...` on an Intel Mac. The app talks to the hosted service, so nothing else is needed to try it. On launch it opens a fresh sample household (the Parkers, with two weeks of history). On the "Who's in" screen, set **Pace: demo (5x)** to run a whole session in under two minutes.
+Use `build/x86_64-debug/...` on an Intel Mac. The app talks to the hosted service, so nothing else is needed to try it. On launch it opens a fresh sample household (the Parkers, with two weeks of history). On the "Who's working out?" screen, set **Pace: demo (5x)** to run a whole session in about two minutes.
 
 **Service** (optional, to host your own; Cloudflare's free plan is enough):
 
@@ -76,7 +76,7 @@ npm install
 npx wrangler d1 create everybody-moves      # put the id in wrangler.jsonc
 npx wrangler d1 execute everybody-moves --remote --file=schema.sql
 npx wrangler deploy
-npm test                                   # 18 tests: planner and coach rules
+npm test                                   # 25 tests: planner, sore-area rules, coach rules
 ```
 
 Then change `BASE` in `tv/src/api.ts`.
@@ -90,7 +90,7 @@ tv/src/ui/Figure.tsx        exercise figures (react-native-svg)
 tv/src/ui/kit.tsx           focus buttons, QR code, countdown ring, 10-foot scale
 tv/src/voice.ts             coach voice (W3C media AudioPlayer)
 tv/src/cues.ts              what the coach says at each block
-tv/test/                    5 unit tests (cues, session clock): npx jest
+tv/test/                    6 unit tests (cues, introduction sentences, session clock): npx jest
 cloud/src/plan.ts           the planner (per person, per household, after each session)
 cloud/src/coach.ts          AI introduction with guardrails
 cloud/src/index.ts          API, sample household, sessions

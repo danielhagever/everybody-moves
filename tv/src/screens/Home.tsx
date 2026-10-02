@@ -13,7 +13,7 @@ export function Home({h, t, onStart, onReset, error}: {h: HouseholdView; t: numb
         <Text style={s.kicker}>Everybody Moves</Text>
         <Text style={[s.h1, {fontSize: u(76)}]}>One workout.{'\n'}Everyone's own version.</Text>
         <Text style={[s.dim, {marginTop: u(18), maxWidth: u(820)}]}>
-          Check in from your phone, and the coach gives each person the right version of every move, from Grandpa's chair squat to Lily's jump squat.
+          Check in from your phone, and the coach gives each person the right version of every move: a chair squat for Grandpa, a knee-friendly move for sore knees, jump squats for whoever is ready.
         </Text>
         <View style={{flexDirection: 'row', marginTop: u(44), alignItems: 'center'}}>
           <FocusButton testID="start" label="Start today's workout" sub={`${h.household.name}`} tone="primary" preferred onPress={onStart} style={{paddingHorizontal: u(56)}} />

@@ -61,10 +61,33 @@ const WALL_IN = pose(WALL_OUT, {head: [160, 58], neck: [150, 74], hip: [122, 124
 // Knee push-up: knees on the floor, feet raised.
 const KNEE_UP: Pose = {head: [162, 114], neck: [146, 124], hip: [100, 154], lElbow: [146, 156], lHand: [146, 188], rElbow: [150, 156], rHand: [150, 188], lKnee: [76, 186], lFoot: [46, 162], rKnee: [78, 187], rFoot: [48, 164]};
 const KNEE_DOWN = pose(KNEE_UP, {head: [166, 160], neck: [150, 168], hip: [104, 176], lElbow: [128, 160], rElbow: [132, 162]});
+// Chair squat, side view: sit back onto a chair behind, then stand.
+const CHAIR_UP = pose(SIDE, {lElbow: [116, 82], lHand: [138, 80], rElbow: [118, 84], rHand: [140, 82]});
+const CHAIR_DOWN: Pose = {head: [104, 66], neck: [96, 84], hip: [72, 124], lElbow: [118, 92], lHand: [142, 90], rElbow: [120, 94], rHand: [144, 92], lKnee: [108, 132], lFoot: [104, 188], rKnee: [110, 134], rFoot: [106, 188]};
+// Couch plank: hands on the couch, body in a straight incline.
+const COUCH_A: Pose = {head: [152, 98], neck: [140, 110], hip: [92, 146], lElbow: [148, 126], lHand: [152, 138], rElbow: [150, 127], rHand: [154, 138], lKnee: [62, 166], lFoot: [34, 186], rKnee: [64, 167], rFoot: [36, 187]};
+const COUCH_B = pose(COUCH_A, {hip: [92, 142]});
+// Supported split squat: one hand on a chair to the right, lower straight down.
+const SPLIT_UP: Pose = {head: [96, 38], neck: [96, 58], hip: [96, 112], lElbow: [124, 74], lHand: [150, 76], rElbow: [94, 86], rHand: [96, 110], lKnee: [112, 150], lFoot: [118, 188], rKnee: [82, 150], rFoot: [70, 188]};
+const SPLIT_DOWN = pose(SPLIT_UP, {head: [96, 62], neck: [96, 82], hip: [96, 136], lElbow: [124, 98], lHand: [150, 98], rElbow: [94, 110], rHand: [96, 134], lKnee: [120, 146], rKnee: [84, 178]});
+// Shoulder rolls: arms relaxed, elbows circle up and back.
+const ROLL_A = pose(STAND, {lElbow: [84, 80], rElbow: [116, 80], lHand: [82, 106], rHand: [118, 106]});
+const ROLL_B = pose(STAND, {lElbow: [80, 86], rElbow: [120, 86], lHand: [78, 112], rHand: [122, 112]});
+// Step jacks with the arms kept low.
+const LOW_L = pose(SHUFFLE_L, {lElbow: [70, 92], lHand: [62, 118], rElbow: [98, 92], rHand: [104, 118]});
+// Easy breathing: standing, arms float a little out and back.
+const BREATHE_OUT = pose(STAND, {lElbow: [80, 84], lHand: [70, 104], rElbow: [120, 84], rHand: [130, 104]});
 const FOLD = pose(SIDE, {head: [140, 150], neck: [128, 132], hip: [100, 112], lElbow: [130, 158], lHand: [126, 182], rElbow: [134, 158], rHand: [130, 182], lKnee: [104, 150], rKnee: [108, 150]});
 
 // Each animation: key poses and seconds per full cycle.
-const ANIMS: Record<string, {frames: Pose[]; period: number; floor?: boolean; prop?: 'chair' | 'wall'}> = {
+type Prop = 'chair' | 'wall' | 'chairBack' | 'chairSide' | 'couch';
+const ANIMS: Record<string, {frames: Pose[]; period: number; floor?: boolean; prop?: Prop}> = {
+  chairsquat: {frames: [CHAIR_UP, CHAIR_DOWN], period: 2.6, prop: 'chairBack'},
+  couchplank: {frames: [COUCH_A, COUCH_B], period: 3.2, prop: 'couch'},
+  splitsquat: {frames: [SPLIT_UP, SPLIT_DOWN], period: 2.6, prop: 'chairSide'},
+  shoulderroll: {frames: [ROLL_A, ROLL_B], period: 2.0},
+  steplow: {frames: [LOW_L, mirror(LOW_L)], period: 1.4},
+  breathe: {frames: [STAND, BREATHE_OUT], period: 5.0},
   seatedmarch: {frames: [SIT, SIT_LIFT], period: 1.4, prop: 'chair'},
   wallpush: {frames: [WALL_OUT, WALL_IN], period: 2.2, prop: 'wall'},
   kneepush: {frames: [KNEE_UP, KNEE_DOWN], period: 2.2, floor: true},
@@ -124,6 +147,24 @@ export function Figure({anim, t, size, color, still}: {anim: string; t: number; 
         <Line x1={68} y1={130} x2={68} y2={74} stroke="#4A5263" strokeWidth={6} strokeLinecap="round" />
       </G>
       <Line x1={176} y1={14} x2={176} y2={192} stroke="#4A5263" strokeWidth={8} opacity={prop === 'wall' ? 1 : 0} />
+      <G opacity={prop === 'chairBack' ? 1 : 0}>
+        <Line x1={40} y1={126} x2={84} y2={126} stroke="#4A5263" strokeWidth={6} strokeLinecap="round" />
+        <Line x1={42} y1={126} x2={42} y2={190} stroke="#4A5263" strokeWidth={5} />
+        <Line x1={82} y1={126} x2={82} y2={190} stroke="#4A5263" strokeWidth={5} />
+        <Line x1={42} y1={126} x2={42} y2={70} stroke="#4A5263" strokeWidth={6} strokeLinecap="round" />
+      </G>
+      <G opacity={prop === 'chairSide' ? 1 : 0}>
+        <Line x1={150} y1={130} x2={186} y2={130} stroke="#4A5263" strokeWidth={6} strokeLinecap="round" />
+        <Line x1={152} y1={130} x2={152} y2={190} stroke="#4A5263" strokeWidth={5} />
+        <Line x1={184} y1={130} x2={184} y2={190} stroke="#4A5263" strokeWidth={5} />
+        <Line x1={152} y1={130} x2={152} y2={76} stroke="#4A5263" strokeWidth={6} strokeLinecap="round" />
+      </G>
+      <G opacity={prop === 'couch' ? 1 : 0}>
+        <Line x1={140} y1={142} x2={192} y2={142} stroke="#4A5263" strokeWidth={7} strokeLinecap="round" />
+        <Line x1={142} y1={142} x2={142} y2={190} stroke="#4A5263" strokeWidth={6} />
+        <Line x1={190} y1={142} x2={190} y2={190} stroke="#4A5263" strokeWidth={6} />
+        <Line x1={190} y1={110} x2={190} y2={142} stroke="#4A5263" strokeWidth={7} strokeLinecap="round" />
+      </G>
       <G>
         {bone(p.hip, p.rKnee, 'rt', 0.55)}
         {bone(p.rKnee, p.rFoot, 'rs', 0.55)}

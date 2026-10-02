@@ -15,3 +15,9 @@ export function cueFor(b: Block, next: Block | undefined, people: Member[]): str
   const head = b.kind === 'warmup' ? `Warm-up. ${b.move}.` : b.kind === 'cooldown' ? `Cool-down. ${b.move}. Breathe out slowly.` : `${b.move}!`;
   return [head, ...callouts.map(c => c + '.')].join(' ');
 }
+
+// Same rule as the service (cloud/src/coach.ts): the introduction is spoken sentence by sentence,
+// and the service has already made the first sentence's audio.
+export function sentences(text: string): string[] {
+  return (text.match(/[^.!?]+(?:[.!?]+(?=\s|$)|$)/g) ?? [text]).map(x => x.trim()).filter(Boolean);
+}

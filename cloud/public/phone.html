@@ -118,7 +118,8 @@ function render() {
       <div class="row5">${ENERGY.map(([v, l]) => `<button data-e="${v}" class="${draft.energy == v ? "on" : ""}"><b>${v}</b>${l}</button>`).join("")}</div>
       <div class="label">Anything sore today?</div>
       <div class="grid">${SORE.map((s) => `<button data-s="${s}" class="${draft.sore.includes(s) ? "on" : ""}">${s[0].toUpperCase() + s.slice(1)}</button>`).join("")}</div>
-      <button class="primary" id="go" ${draft.energy ? "" : "disabled"}>I'm in</button><div class="err" id="err"></div>`);
+      <button class="primary" id="go" ${draft.energy ? "" : "disabled"}>I'm in</button><div class="err" id="err"></div>
+      <p class="why" style="margin-top:18px">General fitness guidance, not medical advice. Stop any move that hurts.</p>`);
     app.querySelectorAll("[data-e]").forEach((b) => b.onclick = () => { draft.energy = Number(b.dataset.e); view = ""; render(); });
     app.querySelectorAll("[data-s]").forEach((b) => b.onclick = () => { const s = b.dataset.s; draft.sore = draft.sore.includes(s) ? draft.sore.filter((x) => x !== s) : [...draft.sore, s]; view = ""; render(); });
     app.querySelector("#go").onclick = async () => {

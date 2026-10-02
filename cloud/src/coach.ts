@@ -10,10 +10,23 @@ import type { Member, Plan } from "./plan";
 const MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
 
 export function templateIntro(members: Member[], plan: Plan): string {
-  const names = members.map((m) => m.name);
-  const who = names.length > 1 ? names.slice(0, -1).join(", ") + " and " + names.at(-1) : names[0];
-  const reasons = plan.notes.slice(0, 3).map((n) => n[0].toUpperCase() + n.slice(1) + ".").join(" ");
-  return `Welcome, ${who}. ${plan.minutes} minutes, focused on ${plan.focus}. ${reasons}`.replace(/\s+/g, " ").trim();
+  const list = (xs: string[]) => (xs.length > 1 ? xs.slice(0, -1).join(", ") + " and " + xs.at(-1) : xs[0]);
+  const cap = (n: string) => n[0].toUpperCase() + n.slice(1) + ".";
+  // Notes: [length reason?, focus, per-person adjustments...]. Each fact is said once, and
+  // nobody's adjustment is dropped: low-energy notes are grouped into one sentence.
+  const focusIdx = plan.notes.findIndex((n) => n.startsWith("today's focus"));
+  const lengthNote = focusIdx > 0 ? cap(plan.notes[0]) : `Today is ${plan.minutes} minutes.`;
+  const people = plan.notes.slice(focusIdx + 1);
+  const tired = people.map((n) => n.match(/^(.+) is low on energy, so /)?.[1]).filter((x): x is string => !!x);
+  const others = people.filter((n) => !/ is low on energy, so /.test(n)).map(cap);
+  const tiredNote = tired.length === 1 ? `${tired[0]} is low on energy, so ${tired[0]} goes one level easier.` : tired.length ? `${list(tired)} are low on energy, so each goes one level easier.` : "";
+  return [`Welcome, ${list(members.map((m) => m.name))}.`, lengthNote, cap(plan.notes[focusIdx]), ...others, tiredNote].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
+}
+
+// Splits spoken text into sentences; the TV plays them one after another, and the server makes
+// the first one's audio while planning so the coach starts at once. Same rule on both sides.
+export function sentences(text: string): string[] {
+  return (text.match(/[^.!?]+(?:[.!?]+(?=\s|$)|$)/g) ?? [text]).map((s) => s.trim()).filter(Boolean);
 }
 
 // Numbers in digits or words ("8", "eight", "twelve"): a spelled-out number is still a claim.

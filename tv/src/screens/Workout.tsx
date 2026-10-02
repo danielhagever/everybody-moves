@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import {Text, View} from 'react-native';
 import {Block, Session} from '../api';
 import {Avatar, C, FocusButton, Ring, Tag, s, u} from '../ui/kit';
@@ -17,6 +17,14 @@ export function Workout({session, index, remaining, t, onControl, coachLine}: {
   const color = KIND_COLOR[b.kind];
   const resting = b.kind === 'rest';
   const total = plan.blocks.reduce((a, x) => a + x.seconds, 0);
+  // "End" stops the session for everyone, so it needs a second press within 5 seconds. The
+  // button stays in place (swapping it out would drop the remote's focus).
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  useEffect(() => {
+    if (!confirmEnd) return;
+    const id = setTimeout(() => setConfirmEnd(false), 5000);
+    return () => clearTimeout(id);
+  }, [confirmEnd]);
   return (
     <View style={[s.screen, {paddingVertical: u(44)}]}>
       <View style={{flexDirection: 'row', flex: 1}}>
@@ -68,12 +76,19 @@ export function Workout({session, index, remaining, t, onControl, coachLine}: {
         ))}
       </View>
       <View style={{flexDirection: 'row', alignItems: 'center', marginTop: u(20)}}>
-        <FocusButton label="Back" small tone="quiet" onPress={() => onControl('prev')} />
+        <FocusButton label="Previous" small tone="quiet" onPress={() => onControl('prev')} />
         <FocusButton testID="pause" label={paused ? 'Resume' : 'Pause'} small preferred onPress={() => onControl(paused ? 'resume' : 'pause')} style={{marginLeft: u(16), minWidth: u(180)}} />
         <FocusButton label="Skip" small tone="quiet" onPress={() => onControl('next')} style={{marginLeft: u(16)}} />
-        <FocusButton label="End" small tone="quiet" onPress={() => onControl('end')} style={{marginLeft: u(16)}} />
+        <FocusButton
+          testID="end"
+          label={confirmEnd ? 'Press again to end' : 'End'}
+          small
+          tone={confirmEnd ? 'primary' : 'quiet'}
+          onPress={() => (confirmEnd ? onControl('end') : setConfirmEnd(true))}
+          style={{marginLeft: u(16)}}
+        />
         <Text style={[s.dim, {marginLeft: u(32), flex: 1, fontSize: u(24), fontStyle: 'italic'}]} numberOfLines={1}>
-          {coachLine ? `Coach: “${coachLine}”` : `Block ${index + 1} of ${plan.blocks.length}${session.pace !== 1 ? ' · demo pace' : ''}`}
+          {confirmEnd ? 'Ends the session for everyone' : coachLine ? `Coach: “${coachLine}”` : `Block ${index + 1} of ${plan.blocks.length}${session.pace !== 1 ? ' · demo pace' : ''}`}
         </Text>
       </View>
     </View>

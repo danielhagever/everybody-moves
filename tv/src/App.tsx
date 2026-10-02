@@ -6,7 +6,7 @@ import {Text, View} from 'react-native';
 import {BackHandler, useTVEventHandler} from '@amazon-devices/react-native-kepler';
 import {api, HouseholdView, Member, position, Rating, Session, Summary} from './api';
 import * as voice from './voice';
-import {cueFor} from './cues';
+import {cueFor, sentences} from './cues';
 import {C, FocusButton, s, u} from './ui/kit';
 import {Home} from './screens/Home';
 import {Lobby} from './screens/Lobby';
@@ -150,7 +150,7 @@ export const App = () => {
       setScreen('plan');
       const people = s2.members;
       voice.prefetch(s2.plan!.blocks.map((b, i) => cueFor(b, s2.plan!.blocks[i + 1], people)));
-      if (s2.coach) voice.say(s2.coach.text);
+      if (s2.coach) voice.sayAll(sentences(s2.coach.text));
     } catch (e: any) {
       setError(String(e?.message ?? e));
     }
@@ -183,6 +183,7 @@ export const App = () => {
   const finish = async () => {
     if (!code || !hid) return;
     setBusy(true);
+    setError(null);
     try {
       const r = await api.finish(code);
       setSummary(r.summary);
@@ -261,7 +262,7 @@ export const App = () => {
     return <PlanScreen session={session} t={t} onStart={() => control('start')} onBack={() => setScreen('lobby')} />;
   if (screen === 'workout' && session?.plan)
     return <Workout session={session} index={pos?.index ?? 0} remaining={pos?.remaining ?? session.plan.blocks[0].seconds} t={t} onControl={control} coachLine={coachLine} />;
-  if (screen === 'rate' && session) return <Rate session={session} onRate={rate} onFinish={finish} busy={busy} />;
+  if (screen === 'rate' && session) return <Rate session={session} onRate={rate} onFinish={finish} busy={busy} error={error} />;
   if (screen === 'summary' && summary) return <SummaryScreen summary={summary} onHome={() => setScreen('home')} />;
   return <View style={s.screen} />;
 };

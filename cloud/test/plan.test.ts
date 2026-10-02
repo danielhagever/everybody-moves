@@ -100,3 +100,31 @@ test("notes only claim changes that happen", () => {
   assert.ok(!p.notes.some((n) => n.startsWith("Joe")), "level 1 can't go easier");
   assert.ok(p.notes.includes("Ben gets shoulder- and knee-friendly versions"));
 });
+
+test("a substitute must spare every sore area; otherwise that person sits the move out", () => {
+  const backKnees = { member_id: "a", energy: 3, sore: ["back", "knees"] as const };
+  // Squats: the knee substitute (bridge) loads the back, the back substitute (chair squat) loads the knees.
+  const sq = variationFor(move("squat"), M("a", 2), { ...backKnees, sore: [...backKnees.sore] });
+  assert.equal(sq.name, "Easy breathing");
+  assert.match(sq.why!, /sitting this one out/);
+  // Push-ups with sore wrists and shoulders: not the wall push-up (shoulders), the dead bug.
+  assert.equal(variationFor(move("pushup"), M("a", 2), { member_id: "a", energy: 3, sore: ["wrists", "shoulders"] }).name, "Dead bug");
+  // Order of tapping doesn't matter.
+  assert.equal(variationFor(move("pushup"), M("a", 2), { member_id: "a", energy: 3, sore: ["shoulders", "wrists"] }).name, "Dead bug");
+});
+
+test("sore knees never kneel: knee push-ups become wall push-ups", () => {
+  assert.equal(variationFor(move("pushup"), M("a", 2), { member_id: "a", energy: 3, sore: ["knees"] }).name, "Wall push-up");
+  assert.equal(variationFor(move("birddog"), M("a", 1), { member_id: "a", energy: 3, sore: ["knees"] }).name, "Standing knee to elbow");
+});
+
+test("a sore area the move doesn't load changes nothing", () => {
+  assert.equal(variationFor(move("plank"), M("a", 2), { member_id: "a", energy: 3, sore: ["knees"] }).name, "Plank");
+});
+
+test("upper-body days read as 'upper body' but are stored as 'upper'", () => {
+  const p = buildPlan([M("a", 2)], [], [past(5, "legs", 9, 9), past(3, "core", 9, 9)], 18);
+  assert.equal(p.focus, "upper body");
+  assert.equal(p.focus_key, "upper");
+  assert.ok(p.notes.some((n) => n.includes("focus is upper body")));
+});

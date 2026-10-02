@@ -55,3 +55,28 @@ test("a reply that turns a shorter session into a longer one is rejected", () =>
   assert.ok(!acceptable("Hello Maya and Grandpa Joe, today is 8 minutes on legs, so we're going a bit longer.", people, short));
   assert.ok(acceptable("Hello Maya and Grandpa Joe, today is a shorter 8 minutes on legs, since 2 of your last 2 sessions ended early.", people, short));
 });
+
+test("the template says each fact once", () => {
+  const short = buildPlan(people, [{ member_id: "m", energy: 3, sore: ["knees"] }], [
+    { started_at: 1, planned_blocks: 9, completed_blocks: 5, weekday: 1, local_hour: 18, focus: "legs" },
+    { started_at: 2, planned_blocks: 9, completed_blocks: 6, weekday: 1, local_hour: 18, focus: "core" },
+  ], 18);
+  const t = templateIntro(people, short);
+  assert.equal((t.match(/8 minutes/g) ?? []).length, 1, t);
+  assert.match(t, /^Welcome, Maya and Grandpa Joe\. 2 of your last 2 sessions/);
+});
+
+test("sentences split the way the TV plays them", async () => {
+  const { sentences } = await import("../src/coach.ts");
+  assert.deepEqual(sentences("Hello Maya. Today is 8 minutes instead of 12! Let's go?"), ["Hello Maya.", "Today is 8 minutes instead of 12!", "Let's go?"]);
+  assert.deepEqual(sentences("No final stop"), ["No final stop"]);
+  assert.deepEqual(sentences("Hi Maya. Let's go"), ["Hi Maya.", "Let's go"]);
+});
+
+test("the template keeps everyone's adjustment", () => {
+  const four: Member[] = ["Maya", "Ben", "Lily", "Joe"].map((n, i) => ({ id: "x" + i, name: n, color: "", level: 2, low_impact: 0 }));
+  const p = buildPlan(four, four.map((m, i) => ({ member_id: m.id, energy: i < 3 ? 1 : 4, sore: i === 3 ? ["knees" as const] : [] })), [], 18);
+  const t = templateIntro(four, p);
+  assert.match(t, /Maya, Ben and Lily are low on energy, so each goes one level easier\./);
+  assert.match(t, /Joe gets knee-friendly versions\./);
+});

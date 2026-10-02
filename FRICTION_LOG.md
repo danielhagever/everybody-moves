@@ -15,9 +15,9 @@ Setup: Vega SDK 0.24.12112, Vega CLI 1.4.2, `helloWorld` template (React Native 
 
 ## 2. Libraries listed for React Native 0.83 are not in the 0.83 profile
 - **Task:** Add the QR-code, async-storage and linear-gradient libraries.
-- **Steps:** The docs give React Native 0.83 versions (`@amazon-devices/react-native-qrcode-svg ~3.0.0`, and so on). Ran `vega project install <package>`.
+- **Steps:** The library pages give React Native 0.83 versions: `@amazon-devices/react-native-qrcode-svg ~3.0.0`, `@amazon-devices/react-native-async-storage__async-storage ~2.1.0`, `@amazon-devices/react-native-mmkv ~1.0.11`. Ran `vega project install <package>` for each.
 - **Expected:** The package is added.
-- **Actual:** `not in OS version 1.2 profile, skipping` / `not found in OS Version 1.2 + RN 0.83 profile` for `react-native-qrcode-svg`, `react-native-async-storage`, `react-native-mmkv` and `react-native-linear-gradient`.
+- **Actual:** `not in OS version 1.2 profile, skipping` / `not found in OS Version 1.2 + RN 0.83 profile` for all three (and for `react-native-linear-gradient`, which has no page in the 0.24 docs).
 - **Severity:** medium
 - **Workaround:** QR code as above; no local key-value storage (see 3).
 - **Suggestion:** Mark each library page with the OS-version profiles it ships in, the same data `vega project install` already uses.
@@ -35,7 +35,7 @@ Setup: Vega SDK 0.24.12112, Vega CLI 1.4.2, `helloWorld` template (React Native 
 - **Task:** Lay out a 10-foot UI for a 1080p TV.
 - **Steps:** Designed at 1920 x 1080 and built.
 - **Expected:** 1920 x 1080 layout units, or a note in the template.
-- **Actual:** Everything rendered at twice the intended size: the window is 960 x 540 units on a 1080p screen.
+- **Actual:** Everything rendered at twice the intended size. Measured on the virtual device: `Dimensions.get('window')` is 960 x 540 with `PixelRatio.get()` 2, and `Dimensions.get('screen')` returns 0 x 0.
 - **Severity:** low
 - **Workaround:** One scale function, `u(n) = n * width / 1920`, applied to every size.
 - **Suggestion:** Say it in the hello-world tutorial and the template (a comment next to the tile size would do).
