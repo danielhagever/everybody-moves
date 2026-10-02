@@ -80,3 +80,11 @@ test("the template keeps everyone's adjustment", () => {
   assert.match(t, /Maya, Ben and Lily are low on energy, so each goes one level easier\./);
   assert.match(t, /Joe gets knee-friendly versions\./);
 });
+
+test("an adjustment is a different version, never a different pace", () => {
+  const maya: Member[] = [{ id: "m", name: "Maya", color: "", level: 2, low_impact: 0 }];
+  const p = buildPlan(maya, [{ member_id: "m", energy: 1, sore: ["knees"] }], [], 18);
+  // A real reply from the model during testing.
+  assert.equal(acceptable("Hello Maya. Today's 12-minute session focuses on legs. Maya, we'll make some adjustments for you with knee-friendly versions and a gentler pace since you're low on energy.", maya, p), false);
+  assert.equal(acceptable("Hello Maya. Today is 12 minutes on legs, the area you trained least recently. Maya gets knee-friendly versions and goes one level easier.", maya, p), true);
+});

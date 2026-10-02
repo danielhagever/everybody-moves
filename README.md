@@ -21,7 +21,7 @@ Built for Fire TV on **Vega OS** with React Native for Vega. Shown here on the *
 | Afterwards | "How did that feel?" for everyone; answer with the remote or on a phone | Easy, Just right, or Hard |
 | Next time | Who levels up or down, and what the household's pattern says about the next session | Your own change |
 
-Remote: OK on the focused button; **play/pause** pauses the session; **fast-forward / rewind** skip blocks; **back** pauses during a workout and steps back elsewhere (it never skips the ratings). **End** (press it twice: the first press asks) stops the session for everyone: the phones move to the rating screen too, and only the work blocks actually finished are counted.
+Remote: OK on the focused button; **play/pause** pauses the session; **fast-forward / rewind** skip blocks (a skipped exercise doesn't count as finished); **back** pauses during a workout and steps back elsewhere (it never skips the ratings). **End** (press it twice: the first press asks) stops the session for everyone: the phones move to the rating screen too, and only the work blocks actually finished are counted.
 
 If the coach's voice can't play (for example when the free daily allowance for the voice model runs out), the TV still shows the line and every phone still gets the caption. Someone who joins after the plan was made follows the figure on the TV, and the phone says why.
 
@@ -33,7 +33,7 @@ The plan is computed on the server, deterministically, so the TV and every phone
 - **Per household:** the focus (legs, upper body, core) is whatever the household trained least recently. The length comes from the household's own history at this time of day: if most recent sessions around this hour ended early, today is 8 minutes; if every one was finished, 15.
 - **After each session:** "hard" lowers that person's level; "easy" twice in a row raises it.
 
-The coach's introduction is phrased by a language model (Llama 4 Scout on Workers AI) from those facts only. The service rejects a reply, and uses a template instead, if it adds a number the plan doesn't contain (in digits or words), names anyone who isn't in the household, leaves someone out, guesses anyone's pronouns, says "longer" about a shortened session (or the reverse), runs long, or takes more than 8 seconds ([`cloud/src/coach.ts`](cloud/src/coach.ts)). Three of those rules come from replies the model actually gave during testing: an invented family member ("Alex and Sam will get gentler versions"), a guessed pronoun, and a reversed reason ("ended early, so we need a bit more time"). The tests include them.
+The coach's introduction is phrased by a language model (Llama 4 Scout on Workers AI) from those facts only. The service rejects a reply, and uses a template instead, if it adds a number the plan doesn't contain (in digits or words), names anyone who isn't in the household, leaves someone out, guesses anyone's pronouns, says "longer" about a shortened session (or the reverse), talks about anyone's pace (everyone shares one timer; only the version changes), runs long, or takes more than 8 seconds ([`cloud/src/coach.ts`](cloud/src/coach.ts)). Four of those rules come from replies the model actually gave during testing: an invented family member ("Alex and Sam will get gentler versions"), a guessed pronoun, a reversed reason ("ended early, so we need a bit more time"), and a pace change that doesn't exist ("a gentler pace since you're low on energy"). The tests include them.
 
 ## Vega and Fire TV specifics
 
@@ -76,7 +76,7 @@ npm install
 npx wrangler d1 create everybody-moves      # put the id in wrangler.jsonc
 npx wrangler d1 execute everybody-moves --remote --file=schema.sql
 npx wrangler deploy
-npm test                                   # 25 tests: planner, sore-area rules, coach rules
+npm test                                   # 29 tests: planner, sore-area rules, skips, coach rules
 ```
 
 Then change `BASE` in `tv/src/api.ts`.

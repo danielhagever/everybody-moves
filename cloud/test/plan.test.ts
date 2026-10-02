@@ -1,7 +1,7 @@
 // Planner rules. Run: node --test test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { adapt, blockStart, buildPlan, completedWork, MOVES, pickFocus, pickMinutes, position, variationFor } from "../src/plan.ts";
+import { adapt, blockStart, buildPlan, completedWork, MOVES, pickFocus, pickMinutes, position, skippedAfter, variationFor } from "../src/plan.ts";
 import type { Member, PastSession } from "../src/plan.ts";
 
 const M = (id: string, level: number, low_impact = 0): Member => ({ id, name: id[0].toUpperCase() + id.slice(1), color: "#fff", level, low_impact });
@@ -127,4 +127,32 @@ test("upper-body days read as 'upper body' but are stored as 'upper'", () => {
   assert.equal(p.focus, "upper body");
   assert.equal(p.focus_key, "upper");
   assert.ok(p.notes.some((n) => n.includes("focus is upper body")));
+});
+
+test("a skipped work block doesn't count as finished; stepping back to it clears that", () => {
+  const p = buildPlan([M("a", 2)], [], [], 18);
+  const work = p.blocks.map((b, i) => (b.kind === "work" ? i : -1)).filter((i) => i >= 0);
+  const all = work.length;
+  // Skip from the first work block, then from the rest block after it: only the work block is marked.
+  let skipped = skippedAfter(p, [], work[0], work[0] + 1);
+  skipped = skippedAfter(p, skipped, work[0] + 1, work[0] + 2);
+  assert.deepEqual(skipped, [work[0]]);
+  const t = { started_at: 1, paused_at: null, paused_ms: 0, offset_ms: 0, skipped };
+  assert.equal(completedWork(p, t, 3_600_000), all - 1);
+  // Previous back into the skipped block: it will be done again, so it's no longer skipped.
+  assert.deepEqual(skippedAfter(p, skipped, work[0] + 1, work[0]), []);
+});
+
+test("someone sore and low on energy hears both", () => {
+  const p = buildPlan([M("maya", 2)], [{ member_id: "maya", energy: 1, sore: ["knees"] }], [], 18);
+  assert.ok(p.notes.includes("Maya gets knee-friendly versions"), p.notes.join(" | "));
+  assert.ok(p.notes.includes("Maya is low on energy, so Maya goes one level easier"), p.notes.join(" | "));
+});
+
+test("every version's figure exists", async () => {
+  const src = await import("node:fs").then((fs) => fs.readFileSync(new URL("../../tv/src/ui/Figure.tsx", import.meta.url), "utf8"));
+  const anims = new Set([...src.matchAll(/^  (\w+): \{frames:/gm)].map((m) => m[1]));
+  for (const mv of MOVES) {
+    for (const v of [...mv.levels, ...mv.instead]) assert.ok(anims.has(v.anim ?? mv.id), `${v.name}: no figure "${v.anim ?? mv.id}"`);
+  }
 });

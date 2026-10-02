@@ -51,6 +51,8 @@ export function acceptable(text: string, members: Member[], plan: Plan): boolean
   // The length moved one way; a reply that says the other way is wrong however warm it sounds.
   if (plan.minutes < 12 && /\b(longer|more time|extra time|make up|bit more)\b/i.test(text)) return false;
   if (plan.minutes > 12 && /\b(shorter|short one|keep it short|keeping it short|less time)\b/i.test(text)) return false;
+  // Everyone shares one timer; an adjustment changes the version of a move, never the pace.
+  if (/\b(pace|paces|speed|slower|faster)\b/i.test(text)) return false;
   const names = new Set(members.flatMap((m) => m.name.split(" ")));
   if (capitalized(text).some((w) => !names.has(w) && !COMMON.has(w) && !(w.toLowerCase() in WORDS))) return false;
   return members.every((m) => text.includes(m.name.split(" ").at(-1)!));
@@ -74,7 +76,7 @@ export async function coachIntro(env: Env, members: Member[], plan: Plan): Promi
         {
           role: "system",
           content:
-            "You are the friendly voice coach of a family workout app on a TV. Write what you say at the start of today's session: two or three short sentences, under 50 words in total, spoken English. Greet everyone in people by name. Say the length and the focus, and explain why, using the reasons; keep each reason's cause and effect exactly as given. If adjustments is not empty, say those adjustments; if it is empty, say nothing about gentler versions. Only mention people listed in people; never invent anyone. Do not add any fact, number, or medical claim that isn't in the facts. Refer to people only by name: never he, she, him, her, his or hers. No emojis, no lists, no quotation marks.",
+            "You are the friendly voice coach of a family workout app on a TV. Write what you say at the start of today's session: two or three short sentences, under 50 words in total, spoken English. Greet everyone in people by name. Say the length and the focus, and explain why, using the reasons; keep each reason's cause and effect exactly as given. If adjustments is not empty, say those adjustments; if it is empty, say nothing about gentler versions. Everyone follows the same timer: an adjustment changes which version of a move a person does, never the pace or speed. Only mention people listed in people; never invent anyone. Do not add any fact, number, or medical claim that isn't in the facts. Refer to people only by name: never he, she, him, her, his or hers. No emojis, no lists, no quotation marks.",
         },
         { role: "user", content: JSON.stringify(facts) },
       ],

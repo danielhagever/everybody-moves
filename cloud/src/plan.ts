@@ -112,12 +112,12 @@ export const MOVES: Move[] = [
   {
     id: "birddog", name: "Bird dog", focus: "core", loads: ["wrists", "knees"],
     levels: [v("Bird dog, arms only", "On hands and knees, reach one arm"), v("Bird dog", "Opposite arm and leg, hold two seconds"), v("Bird dog crunch", "Reach out, then elbow to knee")],
-    instead: [alt("Standing knee to elbow", "Stand tall, slow knee to opposite elbow", "march", ["wrists", "knees", "shoulders"])],
+    instead: [alt("Standing knee to elbow", "Stand tall, slow knee to opposite elbow", "kneetoelbow", ["wrists", "knees", "shoulders"])],
   },
   {
     id: "stretch", name: "Reach and fold", focus: "cooldown", loads: ["back"],
     levels: [v("Reach and soft fold", "Reach up, then bend your knees and fold"), v("Reach and fold", "Reach up tall, fold down slowly"), v("Reach, fold, and walk out", "Fold down, walk your hands out and back")],
-    instead: [alt("Overhead reach", "Reach up, breathe out, arms down", "circles", ["back", "knees", "wrists"])],
+    instead: [alt("Overhead reach", "Reach up, breathe out, arms down", "overheadreach", ["back", "knees", "wrists"])],
   },
 ];
 
@@ -239,16 +239,16 @@ export function buildPlan(members: Member[], checkins: Checkin[], history: PastS
     if (c?.sore.length) {
       const words = c.sore.map((x) => SORE_WORD[x]);
       notes.push(`${m.name} gets ${words.length > 1 ? words.slice(0, -1).map((w) => w + "-").join(", ") + " and " + words.at(-1) : words[0]}-friendly versions`);
-    } else if (c && c.energy <= 2 && m.level > 1) {
-      // Only said when it changes something: level 1 is already the gentlest.
-      notes.push(`${m.name} is low on energy, so ${m.name} goes one level easier`);
     }
+    // Only said when it changes something: level 1 is already the gentlest.
+    if (c && c.energy <= 2 && m.level > 1) notes.push(`${m.name} is low on energy, so ${m.name} goes one level easier`);
   }
   return { minutes, focus: focusLabel, focus_key: focus, blocks, notes, member_levels: Object.fromEntries(members.map((m) => [m.id, m.level])) };
 }
 
 // Where the session is right now, computed the same way on the TV and on every phone.
-export interface Timing { started_at: number | null; paused_at: number | null; paused_ms: number; offset_ms: number; ended_at?: number | null }
+// skipped: the work blocks someone skipped with the remote (they don't count as finished).
+export interface Timing { started_at: number | null; paused_at: number | null; paused_ms: number; offset_ms: number; ended_at?: number | null; skipped?: number[] }
 
 // ended_at is set when the TV ends a session early: from then on everyone sees it as over.
 export function position(plan: Plan, t: Timing, now: number): { index: number; remaining: number; done: boolean } {
@@ -266,7 +266,17 @@ export function position(plan: Plan, t: Timing, now: number): { index: number; r
 // clock ran out. A block that was cut short by "End" doesn't count.
 export function completedWork(plan: Plan, t: Timing, now: number): number {
   const p = position(plan, { ...t, ended_at: null }, t.ended_at ?? now);
-  return plan.blocks.slice(0, p.done ? plan.blocks.length : p.index).filter((b) => b.kind === "work").length;
+  const skipped = new Set(t.skipped ?? []);
+  return plan.blocks.slice(0, p.done ? plan.blocks.length : p.index).filter((b, i) => b.kind === "work" && !skipped.has(i)).length;
+}
+
+// The skipped list after a Skip (next) or Previous (prev) press from block `from` to block `to`.
+// Skipping a work block marks it skipped; going back to a block clears it, since it's done again.
+export function skippedAfter(plan: Plan, skipped: number[], from: number, to: number): number[] {
+  const out = new Set(skipped);
+  if (to > from && plan.blocks[from]?.kind === "work") out.add(from);
+  out.delete(to);
+  return [...out].sort((a, b) => a - b);
 }
 
 // Seconds from the start of the plan to the beginning of block i (used to skip forward or back).

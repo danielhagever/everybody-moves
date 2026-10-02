@@ -14,9 +14,13 @@ export function PlanScreen({session, t, onStart, onBack}: {session: Session; t: 
   return (
     <View style={s.screen}>
       <Text style={s.kicker}>Today's plan</Text>
-      <View style={{flexDirection: 'row', alignItems: 'flex-end'}}>
+      <View style={{flexDirection: 'row', alignItems: 'center'}}>
         <Text style={s.h1}>{plan.minutes} minutes · {plan.focus}</Text>
-        {pace ? <Tag text="Demo pace: 5x faster" color={C.amber} /> : null}
+        {pace ? (
+          <View style={{marginLeft: u(28), marginTop: u(6)}}>
+            <Tag text="Demo pace: 5x faster" color={C.amber} />
+          </View>
+        ) : null}
       </View>
       <View style={[s.panel, {marginTop: u(26), flexDirection: 'row', alignItems: 'center'}]}>
         <View style={{width: u(10), alignSelf: 'stretch', backgroundColor: C.amber, borderRadius: u(5), marginRight: u(28)}} />

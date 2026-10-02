@@ -15,6 +15,7 @@ COMBOS = [
     [("Ben", None, None), ("Lily", None, None), ("Grandpa Joe", None, None)],
     [("Maya", 4, ["shoulders", "knees"])],
     [("Maya", 5, []), ("Ben", 5, []), ("Lily", 5, []), ("Grandpa Joe", 5, [])],
+    [("Maya", 1, ["knees"]), ("Ben", 4, []), ("Lily", 5, []), ("Grandpa Joe", 3, [])],
 ]
 for c in COMBOS:
     hid = req("/api/demo", {})["hid"]; code = req("/api/session/new", {"hid": hid})["code"]

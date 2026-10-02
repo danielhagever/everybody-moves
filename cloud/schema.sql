@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   summary TEXT,
   created_at INTEGER NOT NULL,
   finished_at INTEGER,
-  ended_at INTEGER -- set when the TV ends the session early
+  ended_at INTEGER, -- set when the TV ends the session early
+  skipped TEXT NOT NULL DEFAULT '[]' -- work blocks skipped with the remote (JSON array of block indices)
 );
 CREATE INDEX IF NOT EXISTS sessions_code ON sessions(code);
 CREATE INDEX IF NOT EXISTS sessions_hid ON sessions(hid, created_at);

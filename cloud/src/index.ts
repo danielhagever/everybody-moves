@@ -1,7 +1,7 @@
 import { speech } from "./tts";
 import * as db from "./db";
 import type { Env, SessionRow } from "./db";
-import { adapt, blockStart, buildPlan, completedWork, pickMinutes, position, SORE_AREAS } from "./plan";
+import { adapt, blockStart, buildPlan, completedWork, pickMinutes, position, skippedAfter, SORE_AREAS } from "./plan";
 import type { Member, Plan, Rating } from "./plan";
 import { coachIntro, sentences } from "./coach";
 
@@ -166,7 +166,8 @@ async function control(env: Env, s: SessionRow, action: string) {
     const target = Math.max(0, Math.min(plan.blocks.length - 1, pos.index + (action === "next" ? 1 : -1)));
     const elapsedNow = ((s.paused_at ?? t) - s.started_at! - s.paused_ms + s.offset_ms);
     const offset = s.offset_ms + blockStart(plan, target) * 1000 - elapsedNow + 1;
-    await env.DB.prepare("UPDATE sessions SET offset_ms = ? WHERE id = ?").bind(Math.round(offset), s.id).run();
+    const skipped = skippedAfter(plan, db.timingOf(s).skipped ?? [], pos.index, target);
+    await env.DB.prepare("UPDATE sessions SET offset_ms = ?, skipped = ? WHERE id = ?").bind(Math.round(offset), JSON.stringify(skipped), s.id).run();
   } else if (action === "end" && s.status === "live") {
     // Stop the clock for everyone; ratings come next, then finish.
     await env.DB.prepare("UPDATE sessions SET ended_at = ? WHERE id = ?").bind(t, s.id).run();
@@ -185,7 +186,11 @@ async function finish(env: Env, s: SessionRow) {
   const ratings: Record<string, Rating> = {};
   for (const p of pr) if (p.rating === "easy" || p.rating === "right" || p.rating === "hard") ratings[p.member_id] = p.rating;
   const { level, changes } = adapt(inRoom, ratings, prev);
-  const minutes = Math.round((((s.paused_at ?? s.ended_at ?? t) - s.started_at - s.paused_ms + s.offset_ms) / 60_000) * s.pace);
+  // Time actually spent moving: wall-clock time minus pauses, up to the moment the plan ran out
+  // (skipped time doesn't count, and neither does the time spent rating afterwards).
+  const planMs = plan.blocks.reduce((a, b) => a + b.seconds, 0) * 1000;
+  const movedMs = Math.max(0, Math.min((s.paused_at ?? s.ended_at ?? t) - s.started_at - s.paused_ms, planMs - s.offset_ms));
+  const minutes = Math.round((movedMs / 60_000) * s.pace);
   const summary = { completed_blocks: completed, planned_blocks: plan.blocks.filter((b) => b.kind === "work").length, minutes, changes, who: inRoom.map((m) => m.name) };
   const stmts: D1PreparedStatement[] = [
     env.DB.prepare("UPDATE sessions SET status = 'done', completed_blocks = ?, finished_at = ?, summary = ? WHERE id = ?").bind(completed, t, JSON.stringify(summary), s.id),

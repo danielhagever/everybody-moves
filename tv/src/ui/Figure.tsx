@@ -23,7 +23,7 @@ const SIDE: Pose = {
 };
 const pose = (base: Pose, over: Partial<Pose>): Pose => ({...base, ...over});
 const mirror = (p: Pose): Pose => ({
-  ...p,
+  head: [200 - p.head[0], p.head[1]], neck: [200 - p.neck[0], p.neck[1]], hip: [200 - p.hip[0], p.hip[1]],
   lElbow: [200 - p.rElbow[0], p.rElbow[1]], lHand: [200 - p.rHand[0], p.rHand[1]],
   rElbow: [200 - p.lElbow[0], p.lElbow[1]], rHand: [200 - p.lHand[0], p.lHand[1]],
   lKnee: [200 - p.rKnee[0], p.rKnee[1]], lFoot: [200 - p.rFoot[0], p.rFoot[1]],
@@ -50,7 +50,6 @@ const JACK_IN = STAND;
 const JACK_OUT = pose(STAND, {lElbow: [76, 38], lHand: [62, 16], rElbow: [124, 38], rHand: [138, 16], lKnee: [80, 150], lFoot: [64, 188], rKnee: [120, 150], rFoot: [136, 188]});
 const SHUFFLE_L = pose(STAND, {head: [84, 46], neck: [84, 66], hip: [84, 120], lElbow: [70, 90], lHand: [80, 100], rElbow: [98, 90], rHand: [90, 100], lKnee: [66, 152], lFoot: [58, 188], rKnee: [104, 152], rFoot: [110, 188]});
 const SHUFFLE_R = mirror(SHUFFLE_L);
-const LIFT = pose(STAND, {rKnee: [126, 144], rFoot: [150, 172], lElbow: [80, 80], lHand: [64, 98]});
 const REACH = pose(SIDE, {lElbow: [100, 30], lHand: [100, 6], rElbow: [104, 30], rHand: [104, 6]});
 // Seated march, side view, on a chair.
 const SIT: Pose = {head: [90, 50], neck: [90, 70], hip: [90, 124], lElbow: [98, 100], lHand: [112, 118], rElbow: [100, 102], rHand: [114, 120], lKnee: [130, 126], lFoot: [132, 188], rKnee: [132, 128], rFoot: [134, 188]};
@@ -77,6 +76,14 @@ const ROLL_B = pose(STAND, {lElbow: [80, 86], rElbow: [120, 86], lHand: [78, 112
 const LOW_L = pose(SHUFFLE_L, {lElbow: [70, 92], lHand: [62, 118], rElbow: [98, 92], rHand: [104, 118]});
 // Easy breathing: standing, arms float a little out and back.
 const BREATHE_OUT = pose(STAND, {lElbow: [80, 84], lHand: [70, 104], rElbow: [120, 84], rHand: [130, 104]});
+// Standing knee to elbow: hands by the head, one knee comes up to meet the opposite elbow.
+const GUARD = pose(STAND, {lElbow: [72, 52], lHand: [90, 36], rElbow: [128, 52], rHand: [110, 36]});
+const KNEE_ELBOW = pose(GUARD, {head: [116, 50], neck: [110, 68], lElbow: [84, 60], lHand: [102, 46], lKnee: [130, 104], lFoot: [116, 144], rElbow: [134, 96], rHand: [124, 62]});
+// Overhead reach: arms float up overhead, then back down.
+const ARMS_UP = pose(STAND, {lElbow: [90, 30], lHand: [86, 4], rElbow: [110, 30], rHand: [114, 4]});
+// Standing leg lifts: right hand on a chair at the side, the left leg lifts out.
+const HOLD = pose(STAND, {rElbow: [128, 80], rHand: [150, 96]});
+const HOLD_LIFT = pose(HOLD, {lKnee: [74, 144], lFoot: [50, 172], lElbow: [80, 84], lHand: [68, 104]});
 const FOLD = pose(SIDE, {head: [140, 150], neck: [128, 132], hip: [100, 112], lElbow: [130, 158], lHand: [126, 182], rElbow: [134, 158], rHand: [130, 182], lKnee: [104, 150], rKnee: [108, 150]});
 
 // Each animation: key poses and seconds per full cycle.
@@ -88,6 +95,8 @@ const ANIMS: Record<string, {frames: Pose[]; period: number; floor?: boolean; pr
   shoulderroll: {frames: [ROLL_A, ROLL_B], period: 2.0},
   steplow: {frames: [LOW_L, mirror(LOW_L)], period: 1.4},
   breathe: {frames: [STAND, BREATHE_OUT], period: 5.0},
+  kneetoelbow: {frames: [GUARD, KNEE_ELBOW, GUARD, mirror(KNEE_ELBOW)], period: 2.4},
+  overheadreach: {frames: [STAND, ARMS_UP], period: 4.0},
   seatedmarch: {frames: [SIT, SIT_LIFT], period: 1.4, prop: 'chair'},
   wallpush: {frames: [WALL_OUT, WALL_IN], period: 2.2, prop: 'wall'},
   kneepush: {frames: [KNEE_UP, KNEE_DOWN], period: 2.2, floor: true},
@@ -102,7 +111,7 @@ const ANIMS: Record<string, {frames: Pose[]; period: number; floor?: boolean; pr
   birddog: {frames: [DOG_A, DOG_B], period: 2.8, floor: true},
   jacks: {frames: [JACK_IN, JACK_OUT], period: 1.0},
   shuffle: {frames: [SHUFFLE_L, SHUFFLE_R], period: 1.2},
-  leglift: {frames: [STAND, LIFT], period: 2.0},
+  leglift: {frames: [HOLD, HOLD_LIFT], period: 2.0, prop: 'chairSide'},
   stretch: {frames: [REACH, FOLD], period: 4.0},
 };
 
