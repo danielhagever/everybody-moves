@@ -170,7 +170,7 @@ async function finish(env: Env, s: SessionRow) {
     env.DB.prepare("UPDATE sessions SET status = 'done', completed_blocks = ?, finished_at = ?, summary = ? WHERE id = ?").bind(completed, t, JSON.stringify(summary), s.id),
     ...Object.entries(level).map(([mid, lv]) => env.DB.prepare("UPDATE members SET level = ? WHERE id = ?").bind(lv, mid)),
     env.DB.prepare("INSERT INTO events (hid, at, text) VALUES (?, ?, ?)").bind(s.hid, t, `${summary.who.join(", ")} finished ${completed} of ${summary.planned_blocks} work blocks.`),
-    ...changes.map((c) => env.DB.prepare("INSERT INTO events (hid, at, text) VALUES (?, ?, ?)").bind(s.hid, t, c[0].toUpperCase() + c.slice(1) + ".")),
+    ...changes.map((c, i) => env.DB.prepare("INSERT INTO events (hid, at, text) VALUES (?, ?, ?)").bind(s.hid, t + 1 + i, c[0].toUpperCase() + c.slice(1) + ".")),
   ];
   await env.DB.batch(stmts);
   // What the household's pattern now says about the next session at this time of day.

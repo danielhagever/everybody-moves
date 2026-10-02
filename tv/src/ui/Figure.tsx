@@ -115,15 +115,15 @@ export function Figure({anim, t, size, color, still}: {anim: string; t: number; 
   return (
     <Svg width={size} height={size} viewBox="0 0 200 200">
       <Line x1={10} y1={192} x2={190} y2={192} stroke="#3A4150" strokeWidth={3} strokeLinecap="round" />
-      {prop === 'chair' ? (
-        <G>
-          <Line x1={66} y1={130} x2={112} y2={130} stroke="#4A5263" strokeWidth={6} strokeLinecap="round" />
-          <Line x1={68} y1={130} x2={68} y2={190} stroke="#4A5263" strokeWidth={5} />
-          <Line x1={110} y1={130} x2={110} y2={190} stroke="#4A5263" strokeWidth={5} />
-          <Line x1={68} y1={130} x2={68} y2={74} stroke="#4A5263" strokeWidth={6} strokeLinecap="round" />
-        </G>
-      ) : null}
-      {prop === 'wall' ? <Line x1={176} y1={14} x2={176} y2={192} stroke="#4A5263" strokeWidth={8} /> : null}
+      {/* Props are always drawn and only hidden: on Vega, an SVG element removed between renders
+          can stay on screen, so a chair would linger behind the next move. */}
+      <G opacity={prop === 'chair' ? 1 : 0}>
+        <Line x1={66} y1={130} x2={112} y2={130} stroke="#4A5263" strokeWidth={6} strokeLinecap="round" />
+        <Line x1={68} y1={130} x2={68} y2={190} stroke="#4A5263" strokeWidth={5} />
+        <Line x1={110} y1={130} x2={110} y2={190} stroke="#4A5263" strokeWidth={5} />
+        <Line x1={68} y1={130} x2={68} y2={74} stroke="#4A5263" strokeWidth={6} strokeLinecap="round" />
+      </G>
+      <Line x1={176} y1={14} x2={176} y2={192} stroke="#4A5263" strokeWidth={8} opacity={prop === 'wall' ? 1 : 0} />
       <G>
         {bone(p.hip, p.rKnee, 'rt', 0.55)}
         {bone(p.rKnee, p.rFoot, 'rs', 0.55)}
