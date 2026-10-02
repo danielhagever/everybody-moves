@@ -52,10 +52,22 @@ const SHUFFLE_L = pose(STAND, {head: [84, 46], neck: [84, 66], hip: [84, 120], l
 const SHUFFLE_R = mirror(SHUFFLE_L);
 const LIFT = pose(STAND, {rKnee: [126, 144], rFoot: [150, 172], lElbow: [80, 80], lHand: [64, 98]});
 const REACH = pose(SIDE, {lElbow: [100, 30], lHand: [100, 6], rElbow: [104, 30], rHand: [104, 6]});
+// Seated march, side view, on a chair.
+const SIT: Pose = {head: [90, 50], neck: [90, 70], hip: [90, 124], lElbow: [98, 100], lHand: [112, 118], rElbow: [100, 102], rHand: [114, 120], lKnee: [130, 126], lFoot: [132, 188], rKnee: [132, 128], rFoot: [134, 188]};
+const SIT_LIFT = pose(SIT, {lKnee: [126, 102], lFoot: [138, 150]});
+// Wall push-up, side view, hands on a wall at the right.
+const WALL_OUT: Pose = {head: [150, 50], neck: [140, 66], hip: [116, 120], lElbow: [156, 70], lHand: [170, 70], rElbow: [158, 72], rHand: [170, 74], lKnee: [106, 154], lFoot: [96, 188], rKnee: [108, 155], rFoot: [98, 188]};
+const WALL_IN = pose(WALL_OUT, {head: [160, 58], neck: [150, 74], hip: [122, 124], lElbow: [150, 92], rElbow: [152, 94], lKnee: [110, 156], rKnee: [112, 157]});
+// Knee push-up: knees on the floor, feet raised.
+const KNEE_UP: Pose = {head: [162, 114], neck: [146, 124], hip: [100, 154], lElbow: [146, 156], lHand: [146, 188], rElbow: [150, 156], rHand: [150, 188], lKnee: [76, 186], lFoot: [46, 162], rKnee: [78, 187], rFoot: [48, 164]};
+const KNEE_DOWN = pose(KNEE_UP, {head: [166, 160], neck: [150, 168], hip: [104, 176], lElbow: [128, 160], rElbow: [132, 162]});
 const FOLD = pose(SIDE, {head: [140, 150], neck: [128, 132], hip: [100, 112], lElbow: [130, 158], lHand: [126, 182], rElbow: [134, 158], rHand: [130, 182], lKnee: [104, 150], rKnee: [108, 150]});
 
 // Each animation: key poses and seconds per full cycle.
-const ANIMS: Record<string, {frames: Pose[]; period: number; floor?: boolean}> = {
+const ANIMS: Record<string, {frames: Pose[]; period: number; floor?: boolean; prop?: 'chair' | 'wall'}> = {
+  seatedmarch: {frames: [SIT, SIT_LIFT], period: 1.4, prop: 'chair'},
+  wallpush: {frames: [WALL_OUT, WALL_IN], period: 2.2, prop: 'wall'},
+  kneepush: {frames: [KNEE_UP, KNEE_DOWN], period: 2.2, floor: true},
   march: {frames: [MARCH_A, STAND, mirror(MARCH_A), STAND], period: 1.2},
   circles: {frames: [OUT, pose(OUT, {lHand: [42, 44], rHand: [158, 44]}), pose(OUT, {lHand: [30, 58], rHand: [170, 58]}), pose(OUT, {lHand: [42, 72], rHand: [158, 72]})], period: 1.2},
   squat: {frames: [SQUAT_UP, SQUAT_DOWN], period: 2.4},
@@ -95,6 +107,7 @@ export function poseAt(anim: string, t: number): Pose {
 
 export function Figure({anim, t, size, color, still}: {anim: string; t: number; size: number; color: string; still?: boolean}) {
   const p = poseAt(anim, still ? 0 : t);
+  const prop = ANIMS[anim]?.prop;
   const w = 9;
   const bone = (a: P, b: P, key: string, opacity = 1) => (
     <Line key={key} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} stroke={color} strokeWidth={w} strokeLinecap="round" opacity={opacity} />
@@ -102,6 +115,15 @@ export function Figure({anim, t, size, color, still}: {anim: string; t: number; 
   return (
     <Svg width={size} height={size} viewBox="0 0 200 200">
       <Line x1={10} y1={192} x2={190} y2={192} stroke="#3A4150" strokeWidth={3} strokeLinecap="round" />
+      {prop === 'chair' ? (
+        <G>
+          <Line x1={66} y1={130} x2={112} y2={130} stroke="#4A5263" strokeWidth={6} strokeLinecap="round" />
+          <Line x1={68} y1={130} x2={68} y2={190} stroke="#4A5263" strokeWidth={5} />
+          <Line x1={110} y1={130} x2={110} y2={190} stroke="#4A5263" strokeWidth={5} />
+          <Line x1={68} y1={130} x2={68} y2={74} stroke="#4A5263" strokeWidth={6} strokeLinecap="round" />
+        </G>
+      ) : null}
+      {prop === 'wall' ? <Line x1={176} y1={14} x2={176} y2={192} stroke="#4A5263" strokeWidth={8} /> : null}
       <G>
         {bone(p.hip, p.rKnee, 'rt', 0.55)}
         {bone(p.rKnee, p.rFoot, 'rs', 0.55)}

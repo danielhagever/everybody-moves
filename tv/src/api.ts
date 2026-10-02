@@ -60,6 +60,7 @@ export interface Summary {
   minutes: number;
   changes: string[];
   who: string[];
+  next?: {minutes: number; reason: string};
 }
 
 export interface Session {

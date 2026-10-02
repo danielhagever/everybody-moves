@@ -62,6 +62,14 @@ export function SummaryScreen({summary, onHome}: {summary: Summary; onHome: () =
           <Text style={[s.body, {marginTop: u(14)}]}>Everyone stays at the same level. See you tomorrow.</Text>
         )}
       </View>
+      {summary.next ? (
+        <View style={[s.panel, {marginTop: u(24)}]}>
+          <Text style={[s.kicker, {color: C.dim, fontSize: u(20)}]}>Your household's pattern</Text>
+          <Text style={[s.body, {fontSize: u(30), lineHeight: u(42), marginTop: u(12)}]}>
+            Next session around this time: {summary.next.minutes} minutes, because {summary.next.reason.replace(/, so .*$/, '')}.
+          </Text>
+        </View>
+      ) : null}
       <View style={{flexDirection: 'row', marginTop: u(34)}}>
         <FocusButton testID="home" label="Back to home" tone="primary" preferred onPress={onHome} />
       </View>

@@ -1,7 +1,7 @@
 import { speech } from "./tts";
 import * as db from "./db";
 import type { Env, SessionRow } from "./db";
-import { adapt, blockStart, buildPlan, position, SORE_AREAS } from "./plan";
+import { adapt, blockStart, buildPlan, pickMinutes, position, SORE_AREAS } from "./plan";
 import type { Member, Plan, Rating } from "./plan";
 import { coachIntro } from "./coach";
 
@@ -168,7 +168,12 @@ async function finish(env: Env, s: SessionRow) {
     ...changes.map((c) => env.DB.prepare("INSERT INTO events (hid, at, text) VALUES (?, ?, ?)").bind(s.hid, t, c[0].toUpperCase() + c.slice(1) + ".")),
   ];
   await env.DB.batch(stmts);
-  return json({ ok: true, summary });
+  // What the household's pattern now says about the next session at this time of day.
+  const hist = await db.history(env, s.hid);
+  const next = pickMinutes(hist, s.local_hour ?? 18, []);
+  const full = { ...summary, next: { minutes: next.minutes, reason: next.reason ?? "your recent sessions at this time look steady, so the next one stays at 12 minutes" } };
+  await env.DB.prepare("UPDATE sessions SET summary = ? WHERE id = ?").bind(JSON.stringify(full), s.id).run();
+  return json({ ok: true, summary: full });
 }
 
 async function api(env: Env, req: Request, url: URL): Promise<Response> {

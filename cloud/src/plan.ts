@@ -33,6 +33,7 @@ interface Variation {
   name: string;
   cue: string;
   impact: "low" | "high";
+  anim?: string; // when this version looks different from the base move (a wall push-up stands)
 }
 
 interface Move {
@@ -44,13 +45,13 @@ interface Move {
   instead?: Partial<Record<Sore, Variation & { anim: string }>>;
 }
 
-const v = (name: string, cue: string, impact: "low" | "high" = "low"): Variation => ({ name, cue, impact });
+const v = (name: string, cue: string, impact: "low" | "high" = "low", anim?: string): Variation => ({ name, cue, impact, ...(anim ? { anim } : {}) });
 
 export const MOVES: Move[] = [
   {
     id: "march", name: "March in place", focus: "warmup",
     levels: [v("Easy march", "Lift your feet, swing your arms"), v("Brisk march", "Knees to hip height, arms pumping"), v("High knees", "Quick feet, knees up high", "high")],
-    instead: { knees: { ...v("Seated march", "Sit tall, lift one knee at a time"), anim: "march" } },
+    instead: { knees: { ...v("Seated march", "Sit tall, lift one knee at a time"), anim: "seatedmarch" } },
   },
   {
     id: "circles", name: "Arm circles", focus: "warmup",
@@ -64,8 +65,8 @@ export const MOVES: Move[] = [
   },
   {
     id: "pushup", name: "Push-ups", focus: "upper",
-    levels: [v("Wall push-up", "Hands on the wall, lower your chest"), v("Knee push-up", "Knees down, straight line from head to knees"), v("Push-up", "Full push-up, body straight")],
-    instead: { shoulders: { ...v("Dead bug", "On your back, slowly lower opposite arm and leg"), anim: "deadbug" }, wrists: { ...v("Wall push-up on fists", "Fists on the wall, keep wrists straight"), anim: "pushup" } },
+    levels: [v("Wall push-up", "Hands on the wall, lower your chest", "low", "wallpush"), v("Knee push-up", "Knees down, straight line from head to knees", "low", "kneepush"), v("Push-up", "Full push-up, body straight")],
+    instead: { shoulders: { ...v("Dead bug", "On your back, slowly lower opposite arm and leg"), anim: "deadbug" }, wrists: { ...v("Wall push-up on fists", "Fists on the wall, keep wrists straight"), anim: "wallpush" } },
   },
   {
     id: "jacks", name: "Jacks", focus: "cardio",
@@ -143,7 +144,7 @@ export function variationFor(move: Move, m: Member, c?: Checkin): PersonalVariat
   // Never put a low-impact person, or anyone with sore knees, on a jumping version.
   while (pick.impact === "high" && (m.low_impact || c?.sore.includes("knees")) && lvl > 1) pick = move.levels[--lvl - 1];
   const why = lvl < m.level ? (c && c.energy <= 2 ? "low energy today" : "no jumping") : undefined;
-  return { member_id: m.id, name: pick.name, cue: pick.cue, anim: move.id, why };
+  return { member_id: m.id, name: pick.name, cue: pick.cue, anim: pick.anim ?? move.id, why };
 }
 
 // Which part of the body to work today: whatever the household trained least recently.

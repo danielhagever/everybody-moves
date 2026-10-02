@@ -19,7 +19,9 @@ const numbers = (s: string) => new Set((s.match(/\d+/g) ?? []).map(Number));
 
 export function acceptable(text: string, members: Member[], plan: Plan): boolean {
   if (!text || text.length > 420) return false;
-  if (text.split(/\s+/).length > 55) return false;
+  if (text.split(/\s+/).length > 60) return false;
+  // Names don't tell us anyone's pronouns, so the coach never guesses them.
+  if (/\b(he|she|him|her|his|hers|himself|herself)\b/i.test(text)) return false;
   const allowed = new Set([...numbers(plan.notes.join(" ")), plan.minutes, ...members.map((m) => m.level)]);
   for (const n of numbers(text)) if (!allowed.has(n)) return false;
   return members.every((m) => text.includes(m.name.split(" ").at(-1)!));
@@ -38,7 +40,7 @@ export async function coachIntro(env: Env, members: Member[], plan: Plan): Promi
         {
           role: "system",
           content:
-            "You are the friendly voice coach of a family workout app on a TV. Write what you say at the start of today's session: two or three short sentences, under 45 words in total, spoken English. Greet everyone by name. Mention the length and focus. Explain the reasons given, in your own words, without adding any fact, number, or medical claim that isn't in the facts. No emojis, no lists, no quotation marks.",
+            "You are the friendly voice coach of a family workout app on a TV. Write what you say at the start of today's session: two or three short sentences, under 50 words in total, spoken English. Greet everyone by name. Say the length and the focus, and explain why, using the first reason given. Then mention who gets gentler versions. Do not add any fact, number, or medical claim that isn't in the facts. Refer to people only by name: never he, she, him, her, his or hers. No emojis, no lists, no quotation marks.",
         },
         { role: "user", content: JSON.stringify(facts) },
       ],

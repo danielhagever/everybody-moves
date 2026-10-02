@@ -68,9 +68,9 @@ export function Workout({session, index, remaining, t, onControl, coachLine}: {
         ))}
       </View>
       <View style={{flexDirection: 'row', alignItems: 'center', marginTop: u(20)}}>
-        <FocusButton label="◀" small tone="quiet" onPress={() => onControl('prev')} />
+        <FocusButton label="Back" small tone="quiet" onPress={() => onControl('prev')} />
         <FocusButton testID="pause" label={paused ? 'Resume' : 'Pause'} small preferred onPress={() => onControl(paused ? 'resume' : 'pause')} style={{marginLeft: u(16), minWidth: u(180)}} />
-        <FocusButton label="Skip ▶" small tone="quiet" onPress={() => onControl('next')} style={{marginLeft: u(16)}} />
+        <FocusButton label="Skip" small tone="quiet" onPress={() => onControl('next')} style={{marginLeft: u(16)}} />
         <FocusButton label="End" small tone="quiet" onPress={() => onControl('end')} style={{marginLeft: u(16)}} />
         <Text style={[s.dim, {marginLeft: u(32), flex: 1, fontSize: u(24), fontStyle: 'italic'}]} numberOfLines={1}>
           {coachLine ? `Coach: “${coachLine}”` : `Block ${index + 1} of ${plan.blocks.length}${session.pace !== 1 ? ' · demo pace' : ''}`}
