@@ -58,6 +58,15 @@ Setup: Vega SDK 0.24.12112, Vega CLI 1.4.2, `helloWorld` template (React Native 
 - **Workaround:** Several presses in one command (`inputd-cli button_press KEY_DOWN; sleep 0.35; inputd-cli button_press KEY_ENTER`).
 - **Suggestion:** `vega device press DOWN DOWN ENTER`, or a persistent input connection from the CLI.
 
+## 7. An SVG element removed between renders stays on screen
+- **Task:** Draw a chair behind the seated-march figure only while that move is shown.
+- **Steps:** Rendered `{prop === 'chair' ? <G>...</G> : null}` inside an `@amazon-devices/react-native-svg` `Svg`, then moved to the next block (plank).
+- **Expected:** The chair disappears with the move.
+- **Actual:** The chair lines stayed on screen behind the plank figure for the rest of the session (seen in recordings from the Vega Virtual Device).
+- **Severity:** medium (a visible glitch that's easy to miss)
+- **Workaround:** Always render the chair and the wall, and set `opacity` to 0 when unused, so the SVG tree never loses elements.
+- **Suggestion:** Check child removal in the Vega SVG renderer; until then, a note on the library page.
+
 ## What worked well (for balance)
 - The installer ran unattended (`NONINTERACTIVE=true`), and the virtual device booted in about 35 seconds using about 600 MB on an 8 GB laptop.
 - `AudioPlayer` from `@amazon-devices/react-native-w3cmedia` streamed MP3 from a URL on the first try.
