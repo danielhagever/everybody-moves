@@ -2,10 +2,11 @@
 // every move. The TV runs the session; phones check in by QR code; the service plans the
 // session from the household's history and today's check-ins.
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Text, View} from 'react-native';
+import {Dimensions, Text, View} from 'react-native';
 import {BackHandler, useTVEventHandler} from '@amazon-devices/react-native-kepler';
-import {api, Block, HouseholdView, Member, position, Rating, Session, Summary} from './api';
+import {api, HouseholdView, Member, position, Rating, Session, Summary} from './api';
 import * as voice from './voice';
+import {cueFor} from './cues';
 import {C, FocusButton, s, u} from './ui/kit';
 import {Home} from './screens/Home';
 import {Lobby} from './screens/Lobby';
@@ -14,22 +15,6 @@ import {Workout} from './screens/Workout';
 import {Rate, SummaryScreen} from './screens/Rate';
 
 type Screen = 'loading' | 'home' | 'lobby' | 'plan' | 'workout' | 'rate' | 'summary' | 'error';
-
-// What the coach says when a block starts. Only people whose version differs from the most
-// common one are named, so the line stays short.
-export function cueFor(b: Block, next: Block | undefined, people: Member[]): string {
-  if (b.kind === 'rest') return `Rest. Next up, ${b.move.toLowerCase()}.`;
-  // The "common" version is the one most people do; on a tie, the one nobody had adjusted.
-  const score = new Map<string, number>();
-  for (const v of b.per_member) score.set(v.name, (score.get(v.name) ?? 0) + 1 + (v.why ? 0 : 0.1));
-  const common = [...score.entries()].sort((a, c) => c[1] - a[1])[0]?.[0];
-  const callouts = b.per_member
-    .filter(v => v.name !== common)
-    .map(v => `${people.find(m => m.id === v.member_id)?.name ?? ''}, ${v.name.toLowerCase()}`)
-    .slice(0, 3);
-  const head = b.kind === 'warmup' ? `Warm-up. ${b.move}.` : b.kind === 'cooldown' ? `Cool-down. ${b.move}. Breathe out slowly.` : `${b.move}!`;
-  return [head, ...callouts.map(c => c + '.')].join(' ');
-}
 
 export const App = () => {
   const [screen, setScreen] = useState<Screen>('loading');
@@ -76,6 +61,9 @@ export const App = () => {
   }, [loadHousehold]);
 
   useEffect(() => {
+    // Logged once so the layout-unit size can be checked in the device log.
+    const w = Dimensions.get('window');
+    console.log(`[everybody-moves] window ${w.width}x${w.height} scale ${w.scale}`);
     boot();
   }, [boot]);
 
@@ -89,7 +77,9 @@ export const App = () => {
         const s = await api.session(code);
         skew.current = s.server_now - Math.round((t0 + Date.now()) / 2);
         if (alive) setSession(s);
-      } catch {}
+      } catch {
+        // Keep showing the last state; the next tick tries again.
+      }
     };
     tick();
     const id = setInterval(tick, 1000);
@@ -102,23 +92,26 @@ export const App = () => {
   const now = Date.now() + skew.current;
   const pos = session?.plan && session.timing.started_at ? position(session.plan, session.timing, now) : null;
 
-  // Move between screens as the session advances.
+  const blockIndex = pos?.index ?? -1;
+  const over = !!pos?.done;
+  const endedEarly = !!session?.timing.ended_at;
+
+  // Move between screens as the session advances (the clock ran out, or End was pressed).
   useEffect(() => {
-    if (screen === 'workout' && pos?.done) {
+    if (screen === 'workout' && over) {
       setScreen('rate');
-      voice.say("That's the last one. Great work, everyone. How did it feel?");
+      voice.say(endedEarly ? "Let's stop there. Good work, everyone. How did it feel?" : "That's the last one. Great work, everyone. How did it feel?");
     }
-  }, [screen, pos?.done]);
+  }, [screen, over, endedEarly]);
 
   // Speak each block's cue once, when it starts.
   useEffect(() => {
-    if (screen !== 'workout' || !session?.plan || !pos || pos.done) return;
-    const key = `${session.code}:${pos.index}`;
+    if (screen !== 'workout' || !session?.plan || blockIndex < 0 || over) return;
+    const key = `${session.code}:${blockIndex}`;
     if (spokenFor.current === key) return;
     spokenFor.current = key;
-    const people = session.members;
-    voice.say(cueFor(session.plan.blocks[pos.index], session.plan.blocks[pos.index + 1], people));
-  }, [screen, session, pos?.index, pos?.done]);
+    voice.say(cueFor(session.plan.blocks[blockIndex], session.plan.blocks[blockIndex + 1], session.members));
+  }, [screen, session, blockIndex, over]);
 
   const startSession = async () => {
     if (!hid) return;
@@ -130,7 +123,7 @@ export const App = () => {
       setSession(await api.session(r.code));
       setScreen('lobby');
     } catch (e: any) {
-      setError(String(e?.message ?? e));
+      setError(`Couldn't open a room: ${String(e?.message ?? e)}`);
     }
   };
 
@@ -142,6 +135,10 @@ export const App = () => {
 
   const makePlan = async () => {
     if (!code) return;
+    if (!session?.presence.some(p => p.present)) {
+      setError('Add at least one person first: select a name and press OK, or scan the code.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -159,11 +156,7 @@ export const App = () => {
 
   const control = async (a: 'start' | 'pause' | 'resume' | 'next' | 'prev' | 'end') => {
     if (!code) return;
-    if (a === 'end') {
-      voice.stop();
-      setScreen('rate');
-      return;
-    }
+    if (a === 'end' || a === 'start') voice.stop();
     if (a === 'start') {
       voice.stop();
       spokenFor.current = '';
@@ -195,33 +188,46 @@ export const App = () => {
     setBusy(false);
   };
 
-  // Remote: play/pause pauses the session, fast-forward and rewind skip blocks.
-  useTVEventHandler((evt: any) => {
-    if (screen !== 'workout' || evt?.eventKeyAction !== 1) return;
-    if (evt.eventType === 'playpause') control(session?.timing.paused_at ? 'resume' : 'pause');
-    else if (evt.eventType === 'forward') control('next');
-    else if (evt.eventType === 'rewind') control('prev');
-  });
+  // The remote handlers read the latest state through a ref, so they are registered once
+  // (re-registering on every animation frame could drop presses).
+  const live = useRef({screen, session, control});
+  live.current = {screen, session, control};
+
+  // Remote: play/pause pauses the session, fast-forward and rewind skip blocks. On the Vega
+  // Virtual Device those keys arrive as 'forward' and 'rewind' (the HWEvent type lists
+  // 'skip_forward' / 'skip_backward'), so both spellings are accepted.
+  const onRemote = useCallback((evt: any) => {
+    const {screen: sc, session: se, control: ctl} = live.current;
+    if (sc !== 'workout' || evt?.eventKeyAction !== 1) return;
+    const k = String(evt.eventType);
+    if (k === 'playpause' || k === 'pause' || k === 'play') ctl(se?.timing.paused_at ? 'resume' : 'pause');
+    else if (k === 'skip_forward' || k === 'forward' || k === 'fast_forward') ctl('next');
+    else if (k === 'skip_backward' || k === 'rewind') ctl('prev');
+  }, []);
+  useTVEventHandler(onRemote);
 
   // Back: step out of the current screen instead of leaving the app mid-session.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (screen === 'lobby' || screen === 'summary') {
+      const {screen: sc, session: se, control: ctl} = live.current;
+      if (sc === 'lobby' || sc === 'summary') {
         setScreen('home');
         return true;
       }
-      if (screen === 'plan') {
+      if (sc === 'plan') {
         setScreen('lobby');
         return true;
       }
-      if (screen === 'workout') {
-        control(session?.timing.paused_at ? 'resume' : 'pause');
+      if (sc === 'workout') {
+        ctl(se?.timing.paused_at ? 'resume' : 'pause');
         return true;
       }
+      // Ratings decide next time's levels: back doesn't skip them.
+      if (sc === 'rate') return true;
       return false;
     });
     return () => sub.remove();
-  });
+  }, []);
 
   if (screen === 'loading')
     return (
@@ -241,7 +247,7 @@ export const App = () => {
       </View>
     );
   if (screen === 'home' && house)
-    return <Home h={house} t={t} onStart={startSession} onReset={boot} />;
+    return <Home h={house} t={t} onStart={startSession} onReset={boot} error={error} />;
   if (screen === 'lobby' && session)
     return <Lobby session={session} joinUrl={joinUrl} demoPace={demoPace} onTogglePace={() => setDemoPace(!demoPace)} onToggle={toggle} onPlan={makePlan} busy={busy} error={error} />;
   if (screen === 'plan' && session?.plan)

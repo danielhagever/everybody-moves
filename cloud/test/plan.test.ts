@@ -1,7 +1,7 @@
 // Planner rules. Run: node --test test/
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { adapt, blockStart, buildPlan, MOVES, pickFocus, pickMinutes, position, variationFor } from "../src/plan.ts";
+import { adapt, blockStart, buildPlan, completedWork, MOVES, pickFocus, pickMinutes, position, variationFor } from "../src/plan.ts";
 import type { Member, PastSession } from "../src/plan.ts";
 
 const M = (id: string, level: number, low_impact = 0): Member => ({ id, name: id[0].toUpperCase() + id.slice(1), color: "#fff", level, low_impact });
@@ -54,7 +54,7 @@ test("plan: warm-up, work and rest, cool-down; minutes match the blocks", () => 
   const total = p.blocks.reduce((a, b) => a + b.seconds, 0);
   assert.equal(total, p.minutes * 60);
   for (const b of p.blocks) assert.equal(b.per_member.length, 2);
-  assert.ok(p.notes.some((n) => n.includes("Maya gets knees-friendly")));
+  assert.ok(p.notes.some((n) => n.includes("Maya gets knee-friendly")));
   // Rest blocks preview the next move.
   const i = p.blocks.findIndex((b) => b.kind === "rest");
   assert.equal(p.blocks[i].move_id, p.blocks[i + 1].move_id);
@@ -77,4 +77,26 @@ test("ratings move levels: two easy in a row up, hard down", () => {
   assert.ok(r.changes.some((c) => c.includes("Lily moves up to level 3")));
   assert.ok(r.changes.some((c) => c.includes("one more easy session")));
   assert.ok(!r.changes.some((c) => c.startsWith("Joe")), "level 1 can't go lower, so nothing to announce");
+});
+
+test("ending early: everyone sees it as over, and only finished work blocks count", () => {
+  const p = buildPlan([M("a", 2)], [], [], 18); // 2 warm-ups, then work 40 s + rest 20 s
+  const t0 = 1_000_000;
+  const base = { started_at: t0, paused_at: null, paused_ms: 0, offset_ms: 0 };
+  // 2 warm-ups (120 s) + 1 work + 1 rest (60 s) + 10 s into the second work block.
+  const end = t0 + 190_000;
+  const ended = { ...base, ended_at: end };
+  assert.equal(position(p, ended, end + 999_000).done, true);
+  assert.equal(position(p, ended, end + 999_000).remaining, 0);
+  assert.equal(completedWork(p, ended, end + 999_000), 1, "the block cut short doesn't count");
+  assert.equal(completedWork(p, base, t0 + 3_600_000), p.blocks.filter((b) => b.kind === "work").length);
+  // Paused, then ended: the clock stopped at the pause.
+  assert.equal(completedWork(p, { ...base, paused_at: t0 + 130_000, ended_at: t0 + 900_000 }, t0 + 999_000), 0);
+});
+
+test("notes only claim changes that happen", () => {
+  const ms = [M("joe", 1, 1), M("ben", 2)];
+  const p = buildPlan(ms, [{ member_id: "joe", energy: 1, sore: [] }, { member_id: "ben", energy: 2, sore: ["shoulders", "knees"] }], [], 18);
+  assert.ok(!p.notes.some((n) => n.startsWith("Joe")), "level 1 can't go easier");
+  assert.ok(p.notes.includes("Ben gets shoulder- and knee-friendly versions"));
 });

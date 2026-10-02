@@ -12,6 +12,16 @@ let muted = false;
 const listeners = new Set<(line: string | null) => void>();
 const saidListeners = new Set<(line: string) => void>();
 let current: string | null = null;
+let reported = false; // whether the current line was already reported as said
+
+// Report the line once: when it starts playing, or when the audio fails (the free daily voice
+// allowance can run out), so phones still get the caption.
+function report() {
+  if (current && !reported) {
+    reported = true;
+    saidListeners.forEach(l => l(current!));
+  }
+}
 
 export const ttsUrl = (text: string) => `${BASE}/api/tts?t=${encodeURIComponent(text)}`;
 
@@ -20,11 +30,12 @@ function init() {
     player = new AudioPlayer();
     ready = player.initialize().then(() => {
       player!.addEventListener('ended', next);
-      player!.addEventListener('error', next);
-      // Report the moment a line is actually heard (phones show it as a caption).
-      player!.addEventListener('playing', () => {
-        if (current) saidListeners.forEach(l => l(current!));
+      player!.addEventListener('error', () => {
+        report();
+        next();
       });
+      // Report the moment a line is actually heard (phones show it as a caption).
+      player!.addEventListener('playing', report);
     });
   }
   return ready;
@@ -50,12 +61,14 @@ export async function say(text: string) {
   }
   busy = true;
   current = text;
+  reported = false;
   emit(text);
   try {
     await init();
     player!.src = ttsUrl(text);
     await player!.play();
   } catch {
+    report();
     busy = false;
     emit(null);
   }
@@ -65,7 +78,9 @@ export function stop() {
   pending = null;
   try {
     player?.pause();
-  } catch {}
+  } catch {
+    // Nothing was playing.
+  }
   busy = false;
   emit(null);
 }

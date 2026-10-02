@@ -43,6 +43,7 @@ export interface Timing {
   paused_at: number | null;
   paused_ms: number;
   offset_ms: number;
+  ended_at?: number | null; // set when the session was ended early from the TV
 }
 
 export interface Presence {
@@ -84,13 +85,25 @@ export interface HouseholdView {
   active_days: number;
   events: {at: number; text: string}[];
   recent: {started_at: number; planned_blocks: number; completed_blocks: number; focus: string}[];
+  week: {label: string; done: boolean; today: boolean}[]; // last 7 days in the household's time zone
 }
 
-async function call<T>(path: string, body?: unknown): Promise<T> {
-  const r = await fetch(BASE + path, body === undefined ? undefined : {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(body)});
-  const j = await r.json();
-  if (!r.ok) throw new Error(j?.error ?? `HTTP ${r.status}`);
-  return j as T;
+async function call<T>(path: string, body?: unknown, timeoutMs = 15000): Promise<T> {
+  // Never hang on a bad connection: give up after a while and let the screen say so.
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), timeoutMs);
+  try {
+    const init: {signal: AbortController['signal']; method?: string; headers?: Record<string, string>; body?: string} = {signal: ctl.signal};
+    if (body !== undefined) Object.assign(init, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(body)});
+    const r = await fetch(BASE + path, init);
+    const j = await r.json();
+    if (!r.ok) throw new Error(j?.error ?? `HTTP ${r.status}`);
+    return j as T;
+  } catch (e: any) {
+    throw new Error(e?.name === 'AbortError' ? 'The coach service did not answer in time.' : String(e?.message ?? e));
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export const api = {
@@ -99,7 +112,8 @@ export const api = {
   newSession: (hid: string) => call<{code: string; join_url: string}>('/api/session/new', {hid}),
   session: (code: string) => call<Session>(`/api/session/${code}`),
   present: (code: string, member: string, present: boolean) => call(`/api/session/${code}/present`, {member, present}),
-  plan: (code: string, demoPace: boolean) => call<Session>(`/api/session/${code}/plan`, demoPace ? {pace: 'demo'} : {}),
+  // Planning includes the coach's model call (capped at 8 s on the server), so it gets longer.
+  plan: (code: string, demoPace: boolean) => call<Session>(`/api/session/${code}/plan`, demoPace ? {pace: 'demo'} : {}, 30000),
   control: (code: string, action: 'start' | 'pause' | 'resume' | 'next' | 'prev' | 'end') => call(`/api/session/${code}/control`, {action}),
   rate: (code: string, member: string, rating: Rating) => call(`/api/session/${code}/rate`, {member, rating}),
   finish: (code: string) => call<{summary: Summary}>(`/api/session/${code}/finish`, {}),
@@ -109,9 +123,9 @@ export const api = {
 // Same rule as the server and the phones: where the session is, from the shared start time.
 export function position(plan: Plan, t: Timing, now: number): {index: number; remaining: number; done: boolean} {
   if (!t.started_at) return {index: 0, remaining: plan.blocks[0]?.seconds ?? 0, done: false};
-  let elapsed = ((t.paused_at ?? now) - t.started_at - t.paused_ms + t.offset_ms) / 1000;
+  let elapsed = ((t.paused_at ?? t.ended_at ?? now) - t.started_at - t.paused_ms + t.offset_ms) / 1000;
   for (let i = 0; i < plan.blocks.length; i++) {
-    if (elapsed < plan.blocks[i].seconds) return {index: i, remaining: Math.ceil(plan.blocks[i].seconds - elapsed), done: false};
+    if (elapsed < plan.blocks[i].seconds) return {index: i, remaining: t.ended_at ? 0 : Math.ceil(plan.blocks[i].seconds - elapsed), done: !!t.ended_at};
     elapsed -= plan.blocks[i].seconds;
   }
   return {index: plan.blocks.length - 1, remaining: 0, done: true};

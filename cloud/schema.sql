@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   local_hour INTEGER,
   summary TEXT,
   created_at INTEGER NOT NULL,
-  finished_at INTEGER
+  finished_at INTEGER,
+  ended_at INTEGER -- set when the TV ends the session early
 );
 CREATE INDEX IF NOT EXISTS sessions_code ON sessions(code);
 CREATE INDEX IF NOT EXISTS sessions_hid ON sessions(hid, created_at);

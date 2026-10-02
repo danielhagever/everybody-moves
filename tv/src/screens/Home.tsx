@@ -4,15 +4,9 @@ import {HouseholdView, LEVEL_NAMES} from '../api';
 import {Avatar, C, FocusButton, s, u} from '../ui/kit';
 import {Figure} from '../ui/Figure';
 
-export function Home({h, t, onStart, onReset}: {h: HouseholdView; t: number; onStart: () => void; onReset: () => void}) {
-  const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-  const today = new Date();
-  // Last 7 days, oldest first: did the household work out that day?
-  const week = Array.from({length: 7}, (_, i) => {
-    const d = new Date(today.getTime() - (6 - i) * 86_400_000);
-    const done = h.recent.some(r => new Date(r.started_at).toDateString() === d.toDateString());
-    return {label: days[d.getDay()], done, isToday: i === 6};
-  });
+export function Home({h, t, onStart, onReset, error}: {h: HouseholdView; t: number; onStart: () => void; onReset: () => void; error: string | null}) {
+  // Last 7 days in the household's time zone (computed by the service), oldest first.
+  const week = h.week ?? [];
   return (
     <View style={[s.screen, {flexDirection: 'row'}]}>
       <View style={{flex: 1.35, paddingRight: u(56)}}>
@@ -25,6 +19,7 @@ export function Home({h, t, onStart, onReset}: {h: HouseholdView; t: number; onS
           <FocusButton testID="start" label="Start today's workout" sub={`${h.household.name}`} tone="primary" preferred onPress={onStart} style={{paddingHorizontal: u(56)}} />
           <FocusButton testID="reset" label="New sample household" tone="quiet" small onPress={onReset} style={{marginLeft: u(28)}} />
         </View>
+        {error ? <Text style={[s.dim, {color: C.red, marginTop: u(14)}]}>{error}</Text> : null}
         <View style={{flexDirection: 'row', marginTop: u(52)}}>
           {h.members.map(m => (
             <View key={m.id} style={{alignItems: 'center', marginRight: u(40)}}>
@@ -47,7 +42,7 @@ export function Home({h, t, onStart, onReset}: {h: HouseholdView; t: number; onS
           <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: u(16)}}>
             {week.map((d, i) => (
               <View key={i} style={{alignItems: 'center'}}>
-                <View style={{width: u(46), height: u(46), borderRadius: u(23), backgroundColor: d.done ? C.green : 'transparent', borderWidth: u(3), borderColor: d.isToday ? C.amber : d.done ? C.green : C.line}} />
+                <View style={{width: u(46), height: u(46), borderRadius: u(23), backgroundColor: d.done ? C.green : 'transparent', borderWidth: u(3), borderColor: d.today ? C.amber : d.done ? C.green : C.line}} />
                 <Text style={[s.dim, {fontSize: u(20), marginTop: u(6)}]}>{d.label}</Text>
               </View>
             ))}

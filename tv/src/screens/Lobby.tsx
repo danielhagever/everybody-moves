@@ -63,7 +63,8 @@ export function Lobby({session, joinUrl, demoPace, onTogglePace, onToggle, onPla
             testID="build-plan"
             label={busy ? 'The coach is planning…' : `Build our plan (${inRoom} ${inRoom === 1 ? 'person' : 'people'})`}
             tone="primary"
-            onPress={() => !busy && inRoom > 0 && onPlan()}
+            onPress={() => !busy && onPlan()}
+            style={{flex: 1}}
           />
           <FocusButton testID="pace" label={demoPace ? 'Pace: demo (5x)' : 'Pace: real time'} small tone="quiet" onPress={onTogglePace} style={{marginLeft: u(24)}} />
         </View>

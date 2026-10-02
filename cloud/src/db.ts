@@ -34,7 +34,7 @@ export interface SessionRow {
   id: string; hid: string; code: string; status: string; plan: string | null; coach: string | null;
   started_at: number | null; paused_at: number | null; paused_ms: number; offset_ms: number; pace: number;
   planned_blocks: number; completed_blocks: number; focus: string | null; weekday: number | null; local_hour: number | null;
-  summary: string | null; created_at: number; finished_at: number | null;
+  summary: string | null; created_at: number; finished_at: number | null; ended_at: number | null;
 }
 
 export async function sessionByCode(env: Env, code: string) {
@@ -79,5 +79,5 @@ export async function events(env: Env, hid: string, limit = 8) {
   return (await env.DB.prepare("SELECT at, text FROM events WHERE hid = ? ORDER BY at DESC LIMIT ?").bind(hid, limit).all<{ at: number; text: string }>()).results;
 }
 
-export const timingOf = (s: SessionRow): Timing => ({ started_at: s.started_at, paused_at: s.paused_at, paused_ms: s.paused_ms, offset_ms: s.offset_ms });
+export const timingOf = (s: SessionRow): Timing => ({ started_at: s.started_at, paused_at: s.paused_at, paused_ms: s.paused_ms, offset_ms: s.offset_ms, ended_at: s.ended_at });
 export const planOf = (s: SessionRow): Plan | null => (s.plan ? JSON.parse(s.plan) : null);

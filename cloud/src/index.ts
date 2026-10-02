@@ -1,7 +1,7 @@
 import { speech } from "./tts";
 import * as db from "./db";
 import type { Env, SessionRow } from "./db";
-import { adapt, blockStart, buildPlan, pickMinutes, position, SORE_AREAS } from "./plan";
+import { adapt, blockStart, buildPlan, completedWork, pickMinutes, position, SORE_AREAS } from "./plan";
 import type { Member, Plan, Rating } from "./plan";
 import { coachIntro } from "./coach";
 
@@ -75,7 +75,12 @@ async function householdView(env: Env, hid: string) {
   const DAY = 86_400_000;
   const days = new Set(hist.map((s) => Math.floor((s.started_at - hist[0]?.started_at) / DAY)));
   const thisWeek = hist.filter((s) => db.now() - s.started_at < 7 * DAY).length;
-  return { household: h, members: ms, sessions_total: hist.length, sessions_this_week: thisWeek, active_days: days.size, events: ev, recent: hist.slice(-7) };
+  // The last 7 days in the household's own time zone, oldest first.
+  const dayOf = (at: number) => new Intl.DateTimeFormat("en-CA", { timeZone: h.tz }).format(new Date(at));
+  const label = (at: number) => new Intl.DateTimeFormat("en-US", { timeZone: h.tz, weekday: "narrow" }).format(new Date(at));
+  const done = new Set(hist.map((s) => dayOf(s.started_at)));
+  const week = Array.from({ length: 7 }, (_, i) => { const at = db.now() - (6 - i) * DAY; return { label: label(at), done: done.has(dayOf(at)), today: i === 6 }; });
+  return { household: h, members: ms, sessions_total: hist.length, sessions_this_week: thisWeek, active_days: days.size, events: ev, recent: hist.slice(-7), week };
 }
 
 async function sessionView(env: Env, s: SessionRow) {
@@ -132,9 +137,11 @@ async function control(env: Env, s: SessionRow, action: string) {
   const plan = db.planOf(s);
   if (!plan) return bad("Make a plan first.");
   const t = db.now();
+  if (s.ended_at || s.status === "done") return bad("This session has ended.");
   if (action === "start") {
-    if (s.status !== "ready" && s.status !== "live") return bad("Not ready.");
-    await env.DB.prepare("UPDATE sessions SET status = 'live', started_at = COALESCE(started_at, ?), paused_at = NULL WHERE id = ?").bind(t, s.id).run();
+    // Only a ready session starts; pressing Start again on a live one changes nothing.
+    if (s.status === "ready") await env.DB.prepare("UPDATE sessions SET status = 'live', started_at = ?, paused_at = NULL WHERE id = ?").bind(t, s.id).run();
+    else if (s.status !== "live") return bad("Not ready.");
   } else if (action === "pause" && s.status === "live" && !s.paused_at) {
     await env.DB.prepare("UPDATE sessions SET paused_at = ? WHERE id = ?").bind(t, s.id).run();
   } else if (action === "resume" && s.paused_at) {
@@ -145,8 +152,9 @@ async function control(env: Env, s: SessionRow, action: string) {
     const elapsedNow = ((s.paused_at ?? t) - s.started_at! - s.paused_ms + s.offset_ms);
     const offset = s.offset_ms + blockStart(plan, target) * 1000 - elapsedNow + 1;
     await env.DB.prepare("UPDATE sessions SET offset_ms = ? WHERE id = ?").bind(Math.round(offset), s.id).run();
-  } else if (action === "end") {
-    return finish(env, s);
+  } else if (action === "end" && s.status === "live") {
+    // Stop the clock for everyone; ratings come next, then finish.
+    await env.DB.prepare("UPDATE sessions SET ended_at = ? WHERE id = ?").bind(t, s.id).run();
   }
   return json({ ok: true });
 }
@@ -156,15 +164,13 @@ async function finish(env: Env, s: SessionRow) {
   if (!plan || !s.started_at) return bad("Not started.");
   if (s.status === "done") return json({ ok: true, summary: s.summary ? JSON.parse(s.summary) : null });
   const t = db.now();
-  const pos = position(plan, db.timingOf(s), t);
-  // Work blocks finished: every work block before the current one, plus the current one if it ran out.
-  const completed = plan.blocks.slice(0, pos.done ? plan.blocks.length : pos.index).filter((b) => b.kind === "work").length;
+  const completed = completedWork(plan, db.timingOf(s), t);
   const [all, pr, prev] = await Promise.all([db.members(env, s.hid), db.presence(env, s.id), db.pastRatings(env, s.hid)]);
   const inRoom = all.filter((m) => pr.some((p) => p.member_id === m.id && p.present));
   const ratings: Record<string, Rating> = {};
   for (const p of pr) if (p.rating === "easy" || p.rating === "right" || p.rating === "hard") ratings[p.member_id] = p.rating;
   const { level, changes } = adapt(inRoom, ratings, prev);
-  const minutes = Math.round((((s.paused_at ?? t) - s.started_at - s.paused_ms + s.offset_ms) / 60_000) * s.pace);
+  const minutes = Math.round((((s.paused_at ?? s.ended_at ?? t) - s.started_at - s.paused_ms + s.offset_ms) / 60_000) * s.pace);
   const summary = { completed_blocks: completed, planned_blocks: plan.blocks.filter((b) => b.kind === "work").length, minutes, changes, who: inRoom.map((m) => m.name) };
   const stmts: D1PreparedStatement[] = [
     env.DB.prepare("UPDATE sessions SET status = 'done', completed_blocks = ?, finished_at = ?, summary = ? WHERE id = ?").bind(completed, t, JSON.stringify(summary), s.id),

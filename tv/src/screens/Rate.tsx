@@ -48,7 +48,9 @@ export function SummaryScreen({summary, onHome}: {summary: Summary; onHome: () =
   return (
     <View style={s.screen}>
       <Text style={s.kicker}>Done</Text>
-      <Text style={s.h1}>{summary.completed_blocks} of {summary.planned_blocks} work blocks, together.</Text>
+      <Text style={s.h1}>
+        {summary.completed_blocks} of {summary.planned_blocks} work blocks{summary.who.length > 1 ? ', together' : ''}.
+      </Text>
       <Text style={[s.dim, {marginTop: u(10)}]}>{summary.who.join(', ')}</Text>
       <View style={[s.panel, {marginTop: u(34)}]}>
         <Text style={[s.kicker, {color: C.dim, fontSize: u(20)}]}>Next time</Text>

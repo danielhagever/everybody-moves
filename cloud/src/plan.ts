@@ -164,10 +164,12 @@ export function pickMinutes(history: PastSession[], localHour: number, checkins:
   let reason: string | undefined;
   if (sameSlot.length >= 2) {
     const early = sameSlot.filter((s) => s.completed_blocks < s.planned_blocks).length;
-    if (early * 2 > sameSlot.length) { minutes = 8; reason = `${early} of your last ${sameSlot.length} sessions around this time ended early, so today is 8 minutes`; }
-    else if (early === 0 && sameSlot.length >= 3) { minutes = 15; reason = `you finished your last ${sameSlot.length} sessions around this time, so today is 15 minutes`; }
+    // The reason says which way the length moved, so nobody (the coach's model included) reads
+    // "ended early" as "needs more time".
+    if (early * 2 > sameSlot.length) { minutes = 8; reason = `${early} of your last ${sameSlot.length} sessions around this time ended early, so today is shorter: 8 minutes instead of 12`; }
+    else if (early === 0 && sameSlot.length >= 3) { minutes = 15; reason = `you finished your last ${sameSlot.length} sessions around this time, so today is longer: 15 minutes instead of 12`; }
   }
-  if (avgEnergy <= 2.2 && minutes > 8) { minutes = 8; reason = "energy is low in the room, so today is a gentle 8 minutes"; }
+  if (avgEnergy <= 2.2 && minutes > 8) { minutes = 8; reason = "energy is low in the room, so today is shorter: a gentle 8 minutes instead of 12"; }
   return { minutes, reason };
 }
 
@@ -202,26 +204,40 @@ export function buildPlan(members: Member[], checkins: Checkin[], history: PastS
   const notes: string[] = [];
   if (reason) notes.push(reason);
   notes.push(`today's focus is ${focus}, the area you trained least recently`);
+  const SORE_WORD: Record<Sore, string> = { knees: "knee", back: "back", shoulders: "shoulder", wrists: "wrist" };
   for (const m of members) {
     const c = byMember[m.id];
-    if (c?.sore.length) notes.push(`${m.name} gets ${c.sore.join(" and ")}-friendly versions`);
-    else if (c && c.energy <= 2) notes.push(`${m.name} is low on energy, so ${m.name} goes one level easier`);
+    if (c?.sore.length) {
+      const words = c.sore.map((x) => SORE_WORD[x]);
+      notes.push(`${m.name} gets ${words.length > 1 ? words.slice(0, -1).map((w) => w + "-").join(", ") + " and " + words.at(-1) : words[0]}-friendly versions`);
+    } else if (c && c.energy <= 2 && m.level > 1) {
+      // Only said when it changes something: level 1 is already the gentlest.
+      notes.push(`${m.name} is low on energy, so ${m.name} goes one level easier`);
+    }
   }
   return { minutes, focus, blocks, notes, member_levels: Object.fromEntries(members.map((m) => [m.id, m.level])) };
 }
 
 // Where the session is right now, computed the same way on the TV and on every phone.
-export interface Timing { started_at: number | null; paused_at: number | null; paused_ms: number; offset_ms: number }
+export interface Timing { started_at: number | null; paused_at: number | null; paused_ms: number; offset_ms: number; ended_at?: number | null }
 
+// ended_at is set when the TV ends a session early: from then on everyone sees it as over.
 export function position(plan: Plan, t: Timing, now: number): { index: number; remaining: number; done: boolean } {
   if (!t.started_at) return { index: 0, remaining: plan.blocks[0]?.seconds ?? 0, done: false };
-  const end = t.paused_at ?? now;
+  const end = t.paused_at ?? t.ended_at ?? now;
   let elapsed = (end - t.started_at - t.paused_ms + t.offset_ms) / 1000;
   for (let i = 0; i < plan.blocks.length; i++) {
-    if (elapsed < plan.blocks[i].seconds) return { index: i, remaining: Math.ceil(plan.blocks[i].seconds - elapsed), done: false };
+    if (elapsed < plan.blocks[i].seconds) return { index: i, remaining: t.ended_at ? 0 : Math.ceil(plan.blocks[i].seconds - elapsed), done: !!t.ended_at };
     elapsed -= plan.blocks[i].seconds;
   }
   return { index: plan.blocks.length - 1, remaining: 0, done: true };
+}
+
+// Work blocks finished: every work block before the one in progress, or all of them if the
+// clock ran out. A block that was cut short by "End" doesn't count.
+export function completedWork(plan: Plan, t: Timing, now: number): number {
+  const p = position(plan, { ...t, ended_at: null }, t.ended_at ?? now);
+  return plan.blocks.slice(0, p.done ? plan.blocks.length : p.index).filter((b) => b.kind === "work").length;
 }
 
 // Seconds from the start of the plan to the beginning of block i (used to skip forward or back).

@@ -68,9 +68,9 @@ async function api(path, body) {
 // Same clock as the TV: block index from the server's start time, pauses and skips.
 function position(plan, t, now) {
   if (!t.started_at) return { index: 0, remaining: plan.blocks[0].seconds, done: false };
-  let elapsed = ((t.paused_at ?? now) - t.started_at - t.paused_ms + t.offset_ms) / 1000;
+  let elapsed = ((t.paused_at ?? t.ended_at ?? now) - t.started_at - t.paused_ms + t.offset_ms) / 1000;
   for (let i = 0; i < plan.blocks.length; i++) {
-    if (elapsed < plan.blocks[i].seconds) return { index: i, remaining: Math.ceil(plan.blocks[i].seconds - elapsed), done: false };
+    if (elapsed < plan.blocks[i].seconds) return { index: i, remaining: t.ended_at ? 0 : Math.ceil(plan.blocks[i].seconds - elapsed), done: !!t.ended_at };
     elapsed -= plan.blocks[i].seconds;
   }
   return { index: plan.blocks.length - 1, remaining: 0, done: true };
@@ -131,7 +131,8 @@ function render() {
     const work = plan.blocks.filter((b) => b.kind === "work");
     const seen = new Set(); const rows = [];
     for (const b of work) { if (seen.has(b.move_id)) continue; seen.add(b.move_id); const v = mine(b); if (v) rows.push(`<li><span>${esc(b.move)}</span><span class="mine">${esc(v.name)}${v.why ? `<br><span class="why">${esc(v.why)}</span>` : ""}</span></li>`); }
-    shell(`<div class="card"><div class="kicker">Today, ${plan.minutes} minutes · ${esc(plan.focus)}</div><div class="big">Your versions</div><ul class="plan">${rows.join("")}</ul></div><p class="muted center">Starts from the TV remote.</p>`);
+    const list = rows.length ? `<ul class="plan">${rows.join("")}</ul>` : `<p class="muted">You joined after the plan was made, so you'll follow the figure on the TV. To get your own versions, go back on the TV and build the plan again.</p>`;
+    shell(`<div class="card"><div class="kicker">Today, ${plan.minutes} minutes · ${esc(plan.focus)}</div><div class="big">Your versions</div>${list}</div><p class="muted center">Starts from the TV remote.</p>`);
   } else if (key === "rate") {
     shell(`<h1>How was that for you?</h1><p class="sub">Your answer sets your level for next time.</p>
       <div style="display:grid;gap:10px">${[["easy", "Easy"], ["right", "Just right"], ["hard", "Hard"]].map(([v, l]) => `<button data-r="${v}" style="padding:20px;font-size:20px;font-weight:700">${l}</button>`).join("")}</div><div class="err" id="err"></div>`);
@@ -150,9 +151,11 @@ function render() {
 
 function renderLive(m, plan, pos) {
   const b = plan.blocks[pos.index];
-  const v = mine(b) || b.per_member[0];
+  // Someone who joined after the plan was made has no version of their own: they follow the TV.
+  const follow = (blk) => ({ name: blk.move, cue: "Follow the figure on the TV", why: "you joined after the plan was made" });
+  const v = mine(b) || follow(b);
   const next = plan.blocks[pos.index + 1];
-  const nv = next && (mine(next) || next.per_member[0]);
+  const nv = next && (mine(next) || follow(next));
   const label = { warmup: "Warm-up", work: "Go", rest: "Rest · next up", cooldown: "Cool-down" }[b.kind];
   const pct = Math.max(0, Math.min(100, 100 * (1 - pos.remaining / b.seconds)));
   if (view !== "live") {
