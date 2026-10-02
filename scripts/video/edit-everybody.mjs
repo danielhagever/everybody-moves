@@ -48,11 +48,23 @@ const tEnd = ev(/^end$/);
 // The planning wait ("The coach is planning…", about 9 s) is cut; the title card says so.
 const tBuild = ev(/^pressed LEFT ENTER$/);
 const tPlanReady = ev(/plan ready/);
-const RANGES = [
-  [tHome, tBuild + 0.5],
-  [tPlanReady - 0.5, tLive + 24],
-  [tSkip - 6, tEnd - 4],
-];
+// After the coach's introduction and the narration that follows it, the plan screen just waits
+// for Start; that still stretch is cut too. This needs each coach line's length, so the coach's
+// audio (the same audio the TV played; the service caches each line) is fetched first.
+const lineAudio = [];
+for (const [i, l] of tl.lines.entries()) {
+  const f = path.join(WORK, `coach-${i}.mp3`);
+  if (!existsSync(f)) writeFileSync(f, Buffer.from(await (await fetch(`${BASE}/api/tts?s=${tl.code}&t=${encodeURIComponent(l.text)}`)).arrayBuffer()));
+  lineAudio.push({ f, t: (l.at - tl.T0) / 1000, d: dur(f), text: l.text });
+}
+const tStartPress = tl.log.find((l) => l.what === "pressed ENTER" && l.t > tPlanReady)?.t ?? tLive;
+const introEndT = Math.max(tPlanReady, ...lineAudio.filter((a) => a.t < tStartPress).map((a) => a.t + a.d));
+const N4_TEXT = "The language model only words the plan. Rules check every reply before it's spoken.";
+const cutFrom = introEndT + 0.3 + tts(N4_TEXT, "narrator").dur + 1.0;
+const cutTo = tStartPress - 0.6;
+const RANGES = cutTo - cutFrom > 1
+  ? [[tHome, tBuild + 0.5], [tPlanReady - 0.5, cutFrom], [cutTo, tLive + 24], [tSkip - 6, tEnd - 4]]
+  : [[tHome, tBuild + 0.5], [tPlanReady - 0.5, tLive + 24], [tSkip - 6, tEnd - 4]];
 console.log("ranges", RANGES);
 
 // 3. Narration: [text, anchor in timeline seconds]. Placed in the next gap in the coach's speech.
@@ -64,16 +76,16 @@ const coach = tl.lines.map((l) => ({ text: l.text, t: (l.at - tl.T0) / 1000 }));
 const tRemote = ev(/^pressed DOWN ENTER$/);
 const NARRATION = [
   ["This is the real app, running on the Vega Virtual Device, Amazon's Fire TV simulator, with a sample family and two weeks of history.", tHome + 0.6],
-  ["Everyone joins by scanning the code. Maya marks sore knees, and Lily feels great.", tRoom + 1.0],
+  ["Everyone joins from their phone, with the code on the TV. Maya marks sore knees, and Lily feels great.", tRoom + 1.0],
   ["Ben and Grandpa Joe join with the remote, and the coach builds today's plan from the check-ins and the family's history.", tRemote - 0.5],
-  ["The language model only words the plan. Rules check every reply before it's spoken.", null],
+  [N4_TEXT, null],
   ["Same move, different versions. The phones show each person's own version, the same timer, and captions of the coach.", tLive + 3],
   ["Every row has its own figure, cue and reason, so nobody has to ask what to do.", tLive + 18],
   ["The remote runs the session. Pause, go back, or skip ahead. This recording runs at demo pace, five times faster.", tSkip - 6],
   ["Afterwards, everyone says how it felt, on a phone or with the remote.", tOver + 1],
 ];
 const INTRO = "One workout video can't fit a whole family. Grandpa can't jump, Mom's knee hurts, and the teenager is bored. Everybody Moves gives each person their own version of every move, in one workout on Fire TV.";
-const OUTRO = "Built with React Native for Vega, the Vega media player for the coach's voice, and Cloudflare Workers with Workers AI. Everybody Moves. One workout, everyone's own version.";
+const OUTRO = "Built with React Native for Vega and the Vega media player, with a small cloud service and a hosted language model behind it. Everybody Moves. One workout, everyone's own version.";
 
 // Map timeline seconds to output seconds (after the title card).
 const intro = tts(INTRO, "narrator");
@@ -92,22 +104,17 @@ const END = outro.dur + 1.5;
 const TOTAL = TITLE + mainLen + END;
 console.log({ TITLE, mainLen, END, TOTAL });
 
-// Coach clips: the same audio the TV played (the service caches each line).
-const coachClips = [];
-for (const [i, c] of coach.entries()) {
-  const o = toOut(c.t);
-  if (o == null) continue;
-  const f = path.join(WORK, `coach-${i}.mp3`);
-  if (!existsSync(f)) writeFileSync(f, Buffer.from(await (await fetch(`${BASE}/api/tts?s=${tl.code}&t=${encodeURIComponent(c.text)}`)).arrayBuffer()));
-  coachClips.push({ f, o, d: dur(f), text: c.text });
-}
+// Coach clips on the output timeline (lines inside a cut are dropped).
+const coachClips = lineAudio.map((a) => ({ ...a, o: toOut(a.t) })).filter((a) => a.o != null);
 // Narration clips: if the coach is mid-sentence at the anchor, start right after that line;
 // never overlap other narration. Later coach cues duck under the narration.
 const narr = [{ f: intro.wav, o: 0.5, d: intro.dur, text: INTRO }];
 for (const [text, anchor] of NARRATION) {
   const { wav, dur: d } = tts(text, "narrator");
-  // A null anchor means "right after the coach's introduction".
-  let o = anchor == null ? (coachClips[0] ? coachClips[0].o + coachClips[0].d + 0.3 : null) : toOut(anchor);
+  // A null anchor means "right after the coach's introduction" (now several sentences: every
+  // line spoken before the workout started).
+  const introLines = coachClips.filter((c) => c.o < toOut(tLive));
+  let o = anchor == null ? (introLines.length ? Math.max(...introLines.map((c) => c.o + c.d)) + 0.3 : null) : toOut(anchor);
   if (o == null) continue;
   const speaking = coachClips.find((c) => o >= c.o - 0.2 && o < c.o + c.d);
   if (speaking) o = speaking.o + speaking.d + 0.3;
@@ -139,9 +146,9 @@ const endPng = await still("end", `<div style="height:100%;display:flex;flex-dir
   <ul style="font-size:32px;line-height:1.6;color:#D6DAE2;margin:0;padding-left:34px">
   <li>React Native for Vega: TV focus, remote events (play/pause, skip, back)</li>
   <li>Vega W3C media AudioPlayer: the coach's voice</li>
-  <li>react-native-svg: exercise figures, countdown ring, QR code</li>
-  <li>Cloudflare Workers + D1: planner, sessions, phone check-in</li>
-  <li>Workers AI: Llama 4 Scout (coach intro, checked by rules before it's spoken), Deepgram Aura-2 (voice)</li></ul>
+  <li>SVG on Vega: exercise figures, countdown ring, QR code</li>
+  <li>A small cloud service: the planner, sessions and phone check-in</li>
+  <li>A hosted language model words the coach's introduction, checked by rules; a speech model voices it</li></ul>
   <div style="font-size:26px;color:#8A91A0;margin-top:40px">github.com/danielhagever/everybody-moves</div></div>`);
 // Layout: TV 1200x675 at (36,150); phones 312x675 at (1272,150) and (1604,150).
 const framePng = await still("frame", `
