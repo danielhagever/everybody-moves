@@ -6,7 +6,7 @@ Family workouts fall apart because one video can't fit everyone. Grandpa can't j
 
 Built for Fire TV on **Vega OS** with React Native for Vega. Shown here on the **Vega Virtual Device**.
 
-- **Demo video (under 3 min):** _(added on upload)_
+- **Demo video (2:45):** https://youtu.be/AeWlXk4QVJo
 - **Phone check-in page (works on any phone):** `https://everybody-moves.meshulam791.workers.dev/j/<ROOM>` (the TV shows the code and a QR code)
 - **Service:** https://everybody-moves.meshulam791.workers.dev
 
