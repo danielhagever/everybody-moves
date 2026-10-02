@@ -42,9 +42,9 @@ Setup: Vega SDK 0.24.12112, Vega CLI 1.4.2, `helloWorld` template (React Native 
 
 ## 5. The documented screenshot command hung on the virtual device
 - **Task:** Take screenshots of the app for checking layouts.
-- **Steps:** `vega exec vda shell gwsi-tool-screenshooter /tmp/test.png`, as documented on the VDA tools page.
+- **Steps:** `vega exec vda shell gwsi-tool-screenshooter /tmp/test.png`, as documented on the VDA tools page; later also `vega device run-cmd -c "gwsi-tool-screenshooter /tmp/s1.png"` with developer mode enabled.
 - **Expected:** A PNG on the device.
-- **Actual:** No output; still running after two minutes.
+- **Actual:** No output either way; still running after a minute or two.
 - **Severity:** low
 - **Workaround:** macOS window capture of the simulator window (`screencapture -l <window id>`).
 - **Suggestion:** A `vega device screenshot` command that works on the virtual device and copies the file back.
@@ -66,6 +66,15 @@ Setup: Vega SDK 0.24.12112, Vega CLI 1.4.2, `helloWorld` template (React Native 
 - **Severity:** medium (a visible glitch that's easy to miss)
 - **Workaround:** Always render the chair and the wall, and set `opacity` to 0 when unused, so the SVG tree never loses elements.
 - **Suggestion:** Check child removal in the Vega SVG renderer; until then, a note on the library page.
+
+## 8. The remote-event type names keys that never arrive
+- **Task:** Skip blocks with the remote's fast-forward and rewind buttons.
+- **Steps:** Read `HWEvent` in `@amazon-devices/react-native-kepler` (`Libraries/TV/TVTypes.d.ts`): its `eventType` union includes `'skip_forward'` and `'skip_backward'`, while the comment above it lists `forward` and `rewind`. Tested on the Vega Virtual Device with builds that accepted only one name at a time, pressing `KEY_FASTFORWARD` and `KEY_REWIND` through `inputd-cli`.
+- **Expected:** The typed names work.
+- **Actual:** A handler for `'skip_forward'` / `'skip_backward'` never fired. The events arrive as `'forward'` and `'rewind'`, which the union doesn't contain (it accepts them only through its trailing `string`).
+- **Severity:** medium (a handler written from the type silently does nothing)
+- **Workaround:** Accept both spellings.
+- **Suggestion:** Add `'forward'` and `'rewind'` to the union, or say which names each device sends.
 
 ## What worked well (for balance)
 - The installer ran unattended (`NONINTERACTIVE=true`), and the virtual device booted in about 35 seconds using about 600 MB on an 8 GB laptop.
